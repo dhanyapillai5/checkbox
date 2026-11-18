@@ -6,8 +6,8 @@
 Reusable BlueField image validation and linux-bluefield
 kernel regression jobs in the `com.canonical.contrib.bluefield` namespace.
 
-The `bluefield-image-smoke` plan currently checks the running kernel release
-and required installed packages against candidate expectations.
+The `bluefield-image-smoke` plan currently checks the running kernel release,
+required installed packages and required loaded kernel modules.
 Full-release and kernel-regression plans will reuse applicable jobs.
 
 For provider authoring, see the
@@ -84,7 +84,17 @@ For customized MAAS images, the required subset includes `linux-bluefield`,
 the kernel package name from candidate configuration, not `uname`. Stock BFBs
 may have different package names and need their own independent expectations.
 
-Create `bluefield-smoke.launcher`, replacing all three input placeholders:
+The job `bluefield/modules/required-loaded` reads `/proc/modules` and checks every
+name in the whitespace-separated `BLUEFIELD_REQUIRED_MODULES` input. The DPU
+smoke list includes `mlx5_core`, `mlx5_ib`, `openvswitch`, `mlxbf_gige`,
+`mlxbf_tmfifo`, `ib_core` and `ib_uverbs`. Use module names as listed in
+`/proc/modules`, with underscores. Missing/invalid input, unreadable module state
+and missing modules fail the check. It does not load modules or require root.
+Built-in drivers are not listed in `/proc/modules`; this job specifically asserts
+loaded modules. Device binding, driver/package consistency and RDMA functionality
+require separate assertions. Module-check BF3 execution remains unverified.
+
+Create `bluefield-smoke.launcher`, replacing the candidate input placeholders:
 
 ```ini
 [launcher]
@@ -108,6 +118,7 @@ type = silent
 BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
+BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
 ```
 
 ```bash
@@ -149,5 +160,9 @@ Install the distribution's `shellcheck` package for that check. On BF3, verify
 correct, deliberately wrong and missing expected-kernel inputs through Checkbox.
 For the package job, verify a match, deliberately changed candidate version,
 missing required package and missing input through Checkbox on BF3.
+For the module job, verify the required modules pass, an added nonexistent
+required name fails, and an empty required list fails. Change only expectations;
+do not unload drivers to exercise failure paths. Restore the required list and
+finish with a matching run.
 Deployment, network recovery, dependency delivery and cleanup belong to the
 surrounding workflow. Setup must preserve the image's kernel, DOCA and drivers.

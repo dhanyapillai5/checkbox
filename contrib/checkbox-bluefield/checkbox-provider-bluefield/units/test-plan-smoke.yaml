@@ -8,3 +8,4 @@ description: |
 include:
   - bluefield/kernel/running-release
   - bluefield/packages/required-inventory
+  - bluefield/modules/required-loaded
