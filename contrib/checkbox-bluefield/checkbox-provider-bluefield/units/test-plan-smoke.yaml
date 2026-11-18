@@ -1,0 +1,9 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+unit: test plan
+id: bluefield-image-smoke
+name: BlueField image smoke
+description: |
+  Run single-DPU image checks.
+include:
+  - bluefield/kernel/running-release

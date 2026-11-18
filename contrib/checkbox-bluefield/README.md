@@ -3,17 +3,18 @@
 
 # BlueField Checkbox provider
 
-Provider scaffold for reusable BlueField image validation and linux-bluefield
+Reusable BlueField image validation and linux-bluefield
 kernel regression jobs in the `com.canonical.contrib.bluefield` namespace.
 
-Planned test plans are `bluefield-image-smoke`, `bluefield-image-full-release`
-and `bluefield-kernel-regression`. Jobs and plan selections are delivered in
-separate changes after the scaffold. Provider registration and validation alone
-do not establish hardware coverage.
+The `bluefield-image-smoke` plan currently checks the running kernel release.
+Full-release and kernel-regression plans will reuse applicable jobs.
+
+For provider authoring, see the
+[Checkbox documentation](https://checkbox.readthedocs.io/en/latest/).
 
 ## Requirements and source installation
 
-Provider management requires `checkbox-ng`. The scaffold does not depend on
+Provider management requires `checkbox-ng`. This provider does not depend on
 stock providers or `checkbox-support`. Use a dedicated Python virtual
 environment. On Ubuntu, install matching venv support first: importing `venv`
 alone does not establish that `ensurepip` is available. Ubuntu 24.04 with the
@@ -51,11 +52,46 @@ mkdir -p "$PROVIDERPATH"
 python3 "$P/manage.py" develop -d "$PROVIDERPATH"
 ```
 
-Keep the same environment and `PROVIDERPATH` when invoking Checkbox. Do not mix
-this registration with a separate snap runtime. Record the runtime and provider
-source revision, including any uncommitted changes, with each run. Provider
-version `0.1.0` alone does not identify source changes. ARM64 BF3 installation
-and execution still need verification.
+Keep the same environment and `PROVIDERPATH` when invoking Checkbox.
+
+## Running the smoke plan
+
+The job `bluefield/kernel/running-release` compares the running kernel with
+`BLUEFIELD_EXPECTED_KERNEL`. Supply the exact expected release from the image or
+kernel candidate, not from the running system. Missing or invalid input and
+mismatches fail the job.
+
+Create `bluefield-smoke.launcher`, replacing the expected-kernel placeholder:
+
+```ini
+[launcher]
+launcher_version = 1
+app_id = com.canonical.contrib.bluefield:image-smoke
+app_version = 0.1.0
+stock_reports = text, submission_files
+session_title = BlueField image smoke
+
+[test plan]
+unit = com.canonical.contrib.bluefield::bluefield-image-smoke
+forced = yes
+
+[test selection]
+forced = yes
+
+[ui]
+type = silent
+
+[environment]
+BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
+```
+
+```bash
+checkbox-cli launcher ./bluefield-smoke.launcher
+```
+
+Inspect job outcomes in the reports; CLI completion alone does not establish a
+pass. Record source revisions and expected inputs with the reports. This single
+check does not qualify the complete image. BF3 execution remains unverified.
 
 ## Local development checks
 
@@ -82,6 +118,7 @@ flake8 "$P"
 ```
 
 `manage.py test` uses ShellCheck when checking inline shell job commands.
-Install the distribution's `shellcheck` package when adding those jobs.
+Install the distribution's `shellcheck` package for that check. On BF3, verify
+correct, deliberately wrong and missing expected-kernel inputs through Checkbox.
 Deployment, network recovery, dependency delivery and cleanup belong to the
 surrounding workflow. Setup must preserve the image's kernel, DOCA and drivers.

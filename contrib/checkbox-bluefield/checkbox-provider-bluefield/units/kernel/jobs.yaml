@@ -1,0 +1,13 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/kernel/running-release
+summary: Verify the running kernel matches the expected release
+description: |
+  Compare the running kernel release with BLUEFIELD_EXPECTED_KERNEL supplied by
+  the caller. Missing or invalid input fails the check. This read-only assertion
+  does not establish package identity, boot integrity or image qualification.
+plugin: shell
+estimated_duration: 1
+environ:
+  - BLUEFIELD_EXPECTED_KERNEL
+command: bluefield_kernel.py
