@@ -7,3 +7,4 @@ description: |
   Run single-DPU image checks.
 include:
   - bluefield/kernel/running-release
+  - bluefield/packages/required-inventory
