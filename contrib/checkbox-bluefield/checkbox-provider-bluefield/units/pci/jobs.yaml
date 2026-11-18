@@ -1,0 +1,14 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/pci/expected-bindings
+summary: Verify expected DPU PCI identities and driver bindings
+description: |
+  Compare DPU sysfs PCI identities and bound drivers with the headerless TSV
+  supplied in BLUEFIELD_EXPECTED_PCI. Each row specifies PCI address, vendor ID,
+  device ID and driver. Missing devices, mismatches and invalid inputs fail this
+  read-only check. Host enumeration and interface roles require separate checks.
+plugin: shell
+estimated_duration: 1
+environ:
+  - BLUEFIELD_EXPECTED_PCI
+command: bluefield_pci.py

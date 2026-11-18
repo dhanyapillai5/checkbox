@@ -7,7 +7,8 @@ Reusable BlueField image validation and linux-bluefield
 kernel regression jobs in the `com.canonical.contrib.bluefield` namespace.
 
 The `bluefield-image-smoke` plan currently checks the running kernel release,
-required installed packages and required loaded kernel modules.
+required installed packages, required loaded kernel modules and expected DPU
+PCI identities/driver bindings.
 Full-release and kernel-regression plans will reuse applicable jobs.
 
 For provider authoring, see the
@@ -94,6 +95,21 @@ Built-in drivers are not listed in `/proc/modules`; this job specifically assert
 loaded modules. Device binding, driver/package consistency and RDMA functionality
 require separate assertions. Module-check BF3 execution remains unverified.
 
+The job `bluefield/pci/expected-bindings` takes `BLUEFIELD_EXPECTED_PCI`, an
+absolute path to a headerless TSV file on the DPU. Each row contains the full
+PCI address (domain:bus:slot.function), four-digit lowercase vendor ID, four-digit
+lowercase device ID and bound driver name. Separate fields with tabs; omit `0x`
+prefixes. Supply expectations from the agreed DPU hardware/topology configuration,
+not by copying the observed state for qualification. PCI addresses are specific
+to that configuration and may differ between systems.
+
+The check reads `/sys/bus/pci/devices` without changing driver bindings. Every
+listed address must have the expected identity and driver; extra devices are
+allowed. Missing/unbound devices, identity/driver mismatches, invalid inputs and
+read errors fail the job. Host PCI enumeration, RDMA functionality, interface
+roles and driver/package consistency require separate checks. PCI-check BF3
+execution remains unverified.
+
 Create `bluefield-smoke.launcher`, replacing the candidate input placeholders:
 
 ```ini
@@ -119,6 +135,7 @@ BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
 BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
+BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv
 ```
 
 ```bash
@@ -164,5 +181,8 @@ For the module job, verify the required modules pass, an added nonexistent
 required name fails, and an empty required list fails. Change only expectations;
 do not unload drivers to exercise failure paths. Restore the required list and
 finish with a matching run.
+For the PCI job, verify matching expectations pass, a deliberately wrong expected
+device ID or driver fails, and a missing input fails. Restore matching inputs;
+do not unbind devices to exercise failure paths.
 Deployment, network recovery, dependency delivery and cleanup belong to the
 surrounding workflow. Setup must preserve the image's kernel, DOCA and drivers.
