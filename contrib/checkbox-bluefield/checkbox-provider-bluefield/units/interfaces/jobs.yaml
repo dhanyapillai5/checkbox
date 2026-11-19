@@ -1,0 +1,14 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/interfaces/expected-roles
+summary: Verify required DPU interfaces and representor identities
+description: |
+  Match devlink identities from BLUEFIELD_EXPECTED_INTERFACES against Ethernet
+  ports and verify each discovered netdev exists. Capture actual interface names
+  without relying on fixed names. Missing or ambiguous identities and invalid
+  inputs fail. This read-only check does not assert link health or OVS membership.
+plugin: shell
+estimated_duration: 1
+environ:
+  - BLUEFIELD_EXPECTED_INTERFACES
+command: bluefield_interfaces.py

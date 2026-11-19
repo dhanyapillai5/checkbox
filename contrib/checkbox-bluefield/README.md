@@ -8,7 +8,7 @@ kernel regression jobs in the `com.canonical.contrib.bluefield` namespace.
 
 The `bluefield-image-smoke` plan currently checks the running kernel release,
 required installed packages, required loaded kernel modules and expected DPU
-PCI identities/driver bindings.
+PCI identities/driver bindings, and interface/representor identities.
 Full-release and kernel-regression plans will reuse applicable jobs.
 
 For provider authoring, see the
@@ -110,6 +110,37 @@ read errors fail the job. Host PCI enumeration, RDMA functionality, interface
 roles and driver/package consistency require separate checks. PCI-check BF3
 execution remains unverified.
 
+The job `bluefield/interfaces/expected-roles` takes
+`BLUEFIELD_EXPECTED_INTERFACES`, an absolute path to a JSON list of expected
+devlink identities. It matches Ethernet ports by role, records each discovered
+interface name and verifies the interface exists in `/sys/class/net`. Names and
+devlink port handles are not matching criteria. Each role must match exactly one
+port and a distinct interface; extra ports are allowed. Required fields are:
+
+- `physical`: `port`.
+- `pcipf`: `controller`, `pfnum`, `external` (boolean).
+- `pcisf`: `controller`, `pfnum`, `sfnum`.
+
+For example, a two-port topology with host-PF and SF representors uses:
+
+```json
+[
+  {"flavour": "physical", "port": 0},
+  {"flavour": "physical", "port": 1},
+  {"flavour": "pcipf", "controller": 1, "pfnum": 0, "external": true},
+  {"flavour": "pcipf", "controller": 1, "pfnum": 1, "external": true},
+  {"flavour": "pcisf", "controller": 0, "pfnum": 0, "sfnum": 0},
+  {"flavour": "pcisf", "controller": 0, "pfnum": 1, "sfnum": 0}
+]
+```
+
+Supply identities from the agreed deployment topology; do not generate passing
+expectations from observed state for qualification. The check runs read-only
+`devlink -j port show` with a 30-second timeout. Missing/ambiguous roles, absent
+netdevs, invalid inputs and query/read failures fail. It does not assert link
+state, speed, traffic, SF function health or OVS membership. Interface-check BF3
+execution remains unverified.
+
 Create `bluefield-smoke.launcher`, replacing the candidate input placeholders:
 
 ```ini
@@ -136,6 +167,7 @@ BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.t
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
 BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv
+BLUEFIELD_EXPECTED_INTERFACES = /REPLACE_WITH_DPU_CONFIG_PATH/expected-interfaces.json
 ```
 
 ```bash
@@ -184,5 +216,9 @@ finish with a matching run.
 For the PCI job, verify matching expectations pass, a deliberately wrong expected
 device ID or driver fails, and a missing input fails. Restore matching inputs;
 do not unbind devices to exercise failure paths.
+For the interface job, verify the six expected roles pass and capture the actual
+names. Change an expected SF number to a nonexistent value and verify failure;
+verify missing input fails, then restore matching expectations. Do not remove
+interfaces to exercise failure paths.
 Deployment, network recovery, dependency delivery and cleanup belong to the
 surrounding workflow. Setup must preserve the image's kernel, DOCA and drivers.
