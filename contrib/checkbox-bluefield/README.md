@@ -8,7 +8,8 @@ kernel regression jobs in the `com.canonical.contrib.bluefield` namespace.
 
 The `bluefield-image-smoke` plan currently checks the running kernel release,
 required installed packages, required loaded kernel modules and expected DPU
-PCI identities/driver bindings, and interface/representor identities.
+PCI identities/driver bindings, interface/representor identities and DPU
+management-interface presence.
 Full-release and kernel-regression plans will reuse applicable jobs.
 
 For provider authoring, see the
@@ -141,6 +142,27 @@ netdevs, invalid inputs and query/read failures fail. It does not assert link
 state, speed, traffic, SF function health or OVS membership. Interface-check BF3
 execution remains unverified.
 
+The job `bluefield/management/expected-interfaces` discovers DPU management
+interfaces through sysfs backing-driver identities, reporting their actual names.
+`BLUEFIELD_EXPECTED_MANAGEMENT` points to a JSON object of named roles. Each role
+specifies `driver` and optionally `parent_driver` (the immediate parent device's
+driver). For BlueField OOB and DPU-side tmfifo, use:
+
+```json
+{
+  "oob": {"driver": "mlxbf_gige"},
+  "tmfifo": {"driver": "virtio_net", "parent_driver": "bf-tmfifo"}
+}
+```
+
+The parent identity distinguishes tmfifo from unrelated virtio interfaces.
+Names and numbered platform-device paths are not matching criteria. Require
+exactly one distinct interface per role; extra interfaces are allowed. Missing
+or ambiguous matches, invalid inputs and read errors fail. The check is
+read-only and needs no host RShim access. It does not assert IP addresses,
+routes, link state, connectivity or host/BMC ownership. Management-check BF3
+execution remains unverified.
+
 Create `bluefield-smoke.launcher`, replacing the candidate input placeholders:
 
 ```ini
@@ -168,6 +190,7 @@ BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
 BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv
 BLUEFIELD_EXPECTED_INTERFACES = /REPLACE_WITH_DPU_CONFIG_PATH/expected-interfaces.json
+BLUEFIELD_EXPECTED_MANAGEMENT = /REPLACE_WITH_DPU_CONFIG_PATH/expected-management.json
 ```
 
 ```bash
@@ -220,5 +243,9 @@ For the interface job, verify the six expected roles pass and capture the actual
 names. Change an expected SF number to a nonexistent value and verify failure;
 verify missing input fails, then restore matching expectations. Do not remove
 interfaces to exercise failure paths.
+For the management job, verify both roles pass and capture their discovered
+names. Change the expected tmfifo parent driver to a nonexistent value and
+verify failure. Verify missing input fails, then restore matching expectations.
+Change only input files; do not disable management drivers or interfaces.
 Deployment, network recovery, dependency delivery and cleanup belong to the
 surrounding workflow. Setup must preserve the image's kernel, DOCA and drivers.
