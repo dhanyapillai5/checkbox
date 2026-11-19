@@ -9,7 +9,7 @@ kernel regression jobs in the `com.canonical.contrib.bluefield` namespace.
 The `bluefield-image-smoke` plan currently checks the running kernel release,
 required installed packages, required loaded kernel modules and expected DPU
 PCI identities/driver bindings, interface/representor identities and DPU
-management-interface presence.
+management-interface presence and tmfifo address assignment.
 Full-release and kernel-regression plans will reuse applicable jobs.
 
 For provider authoring, see the
@@ -163,6 +163,20 @@ read-only and needs no host RShim access. It does not assert IP addresses,
 routes, link state, connectivity or host/BMC ownership. Management-check BF3
 execution remains unverified.
 
+The job `bluefield/management/tmfifo-address` discovers the DPU tmfifo interface
+through `virtio_net` under `bf-tmfifo`, then uses read-only `ip -j address show`
+with a 30-second timeout. Set `BLUEFIELD_EXPECTED_TMFIFO_ADDRESS` to the exact
+address/prefix required by the image's network configuration. For the stock-BFB
+sandbird trial, Netplan explicitly configures `192.168.100.2/30`; confirm the
+customized candidate's configuration before qualification. The expected address
+is supplied independently of the observed running address.
+
+The check records the discovered name and assigned addresses. Extra addresses
+are allowed; missing/ambiguous tmfifo interfaces, missing expected addresses,
+invalid inputs and query/read errors fail. Both address and prefix must match.
+This assertion does not require an OOB IP, routes, DNS, host connectivity or host
+RShim ownership. Tmfifo-address BF3 execution remains unverified.
+
 Create `bluefield-smoke.launcher`, replacing the candidate input placeholders:
 
 ```ini
@@ -191,6 +205,7 @@ BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfi
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv
 BLUEFIELD_EXPECTED_INTERFACES = /REPLACE_WITH_DPU_CONFIG_PATH/expected-interfaces.json
 BLUEFIELD_EXPECTED_MANAGEMENT = /REPLACE_WITH_DPU_CONFIG_PATH/expected-management.json
+BLUEFIELD_EXPECTED_TMFIFO_ADDRESS = REPLACE_WITH_CONFIGURED_TMFIFO_ADDRESS_PREFIX
 ```
 
 ```bash
@@ -247,5 +262,8 @@ For the management job, verify both roles pass and capture their discovered
 names. Change the expected tmfifo parent driver to a nonexistent value and
 verify failure. Verify missing input fails, then restore matching expectations.
 Change only input files; do not disable management drivers or interfaces.
+For the tmfifo address job, verify the configured address/prefix passes, a wrong
+address or prefix fails, and missing input fails. Restore the correct expectation
+and finish with a matching run; do not change the actual interface configuration.
 Deployment, network recovery, dependency delivery and cleanup belong to the
 surrounding workflow. Setup must preserve the image's kernel, DOCA and drivers.

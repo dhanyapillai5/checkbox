@@ -38,8 +38,8 @@ def driver_name(device):
         return None
 
 
-def check_interfaces(expected, root=Path("/sys/class/net")):
-    """Require unique distinct interfaces and report their discovered names."""
+def discover_interfaces(root=Path("/sys/class/net")):
+    """Return interface names and their backing device/parent drivers."""
     observed = {}
     for interface in sorted(root.iterdir()):
         try:
@@ -53,6 +53,12 @@ def check_interfaces(expected, root=Path("/sys/class/net")):
             "driver": driver_name(device),
             "parent_driver": driver_name(device.parent),
         }
+    return observed
+
+
+def check_interfaces(expected, root=Path("/sys/class/net")):
+    """Require unique distinct interfaces and report their discovered names."""
+    observed = discover_interfaces(root)
 
     failed = False
     used = set()

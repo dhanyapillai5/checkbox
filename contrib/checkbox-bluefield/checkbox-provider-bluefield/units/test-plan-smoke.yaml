@@ -12,3 +12,4 @@ include:
   - bluefield/pci/expected-bindings
   - bluefield/interfaces/expected-roles
   - bluefield/management/expected-interfaces
+  - bluefield/management/tmfifo-address
