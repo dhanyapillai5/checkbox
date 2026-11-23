@@ -59,6 +59,28 @@ Keep the same environment and `PROVIDERPATH` when invoking Checkbox.
 
 ## Running the smoke plan
 
+The job `bluefield/cloud-init/completed` waits up to 120 seconds for cloud-init,
+then collects JSON status and `cloud-id` (each with a 30-second timeout). Supply
+`BLUEFIELD_EXPECTED_DATASOURCE` as the expected `cloud-id` value from deployment
+configuration, for example `maas` for the customized MAAS image. Do not assume
+that value for stock BFBs. Status details and command diagnostics are captured.
+
+Require `done` status, the expected datasource and no fatal/stage errors.
+Timeouts, disabled/incomplete states, invalid status and unknown recoverable
+issues fail. Exit code 2 or `degraded done` alone is not sufficient to classify
+the outcome. The only accepted recoverable messages are early MAAS cache/search
+event-posting warnings caused by network-unreachable errors to the datasource's
+MAAS status endpoint. These are retained as `WARNING:` diagnostics, not hidden.
+Acceptance additionally requires `BLUEFIELD_EXPECTED_OOB_ADDRESS` (address/prefix)
+and `BLUEFIELD_EXPECTED_OOB_GATEWAY`, supplied from deployment configuration.
+The job discovers the unique `mlxbf_gige` interface and verifies that address
+and default route using read-only, bounded `ip` queries. No lab defaults apply.
+Rename failures, Netplan failures, unrecognised warnings and recoverable
+ERROR/CRITICAL entries remain blocking. No blanket deprecation exception exists.
+The job can pass with reporting warnings; it does not claim clean completion.
+Resulting user, SSH-key and network state require separate assertions.
+Cloud-init-check BF3 execution remains unverified.
+
 The job `bluefield/kernel/running-release` compares the running kernel with
 `BLUEFIELD_EXPECTED_KERNEL`. Supply the exact expected release from the image or
 kernel candidate, not from the running system. Missing or invalid input and
@@ -198,6 +220,9 @@ forced = yes
 type = silent
 
 [environment]
+BLUEFIELD_EXPECTED_DATASOURCE = REPLACE_WITH_DEPLOYMENT_DATASOURCE
+BLUEFIELD_EXPECTED_OOB_ADDRESS = REPLACE_WITH_DEPLOYMENT_OOB_ADDRESS_PREFIX
+BLUEFIELD_EXPECTED_OOB_GATEWAY = REPLACE_WITH_DEPLOYMENT_OOB_GATEWAY
 BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
@@ -262,6 +287,10 @@ For the management job, verify both roles pass and capture their discovered
 names. Change the expected tmfifo parent driver to a nonexistent value and
 verify failure. Verify missing input fails, then restore matching expectations.
 Change only input files; do not disable management drivers or interfaces.
+For the cloud-init job, inspect `cloud-init status --long --format=json` and
+`cloud-id` first. Verify healthy matching input passes, a wrong expected
+datasource fails, and empty input fails. Restore the correct expectation.
+Do not rerun cloud-init or change its state to exercise failure paths.
 For the tmfifo address job, verify the configured address/prefix passes, a wrong
 address or prefix fails, and missing input fails. Restore the correct expectation
 and finish with a matching run; do not change the actual interface configuration.
