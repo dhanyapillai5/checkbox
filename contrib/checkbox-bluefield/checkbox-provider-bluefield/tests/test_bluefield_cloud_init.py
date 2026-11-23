@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -51,9 +52,190 @@ REPORTING = dict(
     extended_status="degraded done",
     recoverable_errors={"WARNING": [WARNING]},
 )
+RENAME = (
+    "Failed to rename devices: Failed to apply network config names: "
+    "[nic not present] Cannot rename mac=a0:88:c2:08:0e:37 to p1, not available."
+)
+RECOVERY = {
+    "name": "p1",
+    "mac": "a0:88:c2:08:0e:37",
+    "port": 1,
+    "mtu": 1500,
+    "addresses": [],
+}
 
 
 class CloudInitTests(unittest.TestCase):
+    def test_exact_rename_requires_verified_recovery_and_deduplicates(self):
+        details = dict(
+            REPORTING, recoverable_errors={"WARNING": [RENAME, RENAME]}
+        )
+        details["init"] = {"recoverable_errors": {"WARNING": [RENAME]}}
+        for recovered in (False, True):
+            with patch.object(
+                helper, "recovered_rename", return_value=recovered
+            ) as check:
+                outcome, output, _ = self.run_check(
+                    details=details, status=2, wait=2
+                )
+                self.assertEqual(outcome, 0 if recovered else 1)
+                check.assert_called_once_with(RENAME)
+                if recovered:
+                    self.assertIn(
+                        "WARNING: recovered early rename issue", output
+                    )
+
+    def test_mixed_reporting_and_rename_require_both_guards(self):
+        details = dict(
+            REPORTING, recoverable_errors={"WARNING": [WARNING, RENAME]}
+        )
+        with patch.object(
+            helper, "recovered_rename", return_value=True
+        ), patch.object(
+            helper, "management_ready", return_value=False
+        ) as network:
+            self.assertEqual(
+                self.run_check(details=details, wait=2, status=2)[0], 1
+            )
+            network.assert_called_once_with()
+
+    def test_unknown_issue_or_fatal_error_cannot_be_hidden_by_recovery(self):
+        for extra in (
+            {"errors": ["fatal"]},
+            {
+                "init": {
+                    "recoverable_errors": {"WARNING": ["netplan apply failed"]}
+                }
+            },
+        ):
+            details = dict(
+                REPORTING, recoverable_errors={"WARNING": [RENAME]}, **extra
+            )
+            with patch.object(helper, "recovered_rename") as check:
+                self.assertEqual(
+                    self.run_check(details=details, status=2)[0], 1
+                )
+                check.assert_not_called()
+
+    def test_recovery_evidence_must_match_deployment_profile(self):
+        link = {
+            "ifname": "p1",
+            "address": RECOVERY["mac"],
+            "mtu": 1500,
+            "flags": ["UP"],
+            "addr_info": [{"local": "fe80::1", "prefixlen": 64}],
+        }
+        port = {"flavour": "physical", "port": 1, "netdev": "p1"}
+        cases = [([link], [port], True)]
+        for change in (
+            {"ifname": "other"},
+            {"address": "00:11:22:33:44:55"},
+            {"mtu": 9000},
+            {"flags": []},
+            {"addr_info": [{"local": "192.0.2.1", "prefixlen": 24}]},
+        ):
+            cases.append(([dict(link, **change)], [port], False))
+        cases.extend(
+            [
+                ([], [port], False),
+                ([link, link], [port], False),
+                ([link], [], False),
+                ([link], [port, port], False),
+                ([link], [dict(port, flavour="pcipf")], False),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "recovery.json"
+            source.write_text(json.dumps([RECOVERY]))
+            for links, ports, expected in cases:
+                responses = [
+                    subprocess.CompletedProcess([], 0, json.dumps(value), "")
+                    for value in (links, {"port": dict(enumerate(ports))})
+                ]
+                with self.subTest(links=links, ports=ports), patch.dict(
+                    os.environ,
+                    {"BLUEFIELD_EXPECTED_RENAME_RECOVERY": str(source)},
+                ), patch.object(
+                    helper, "run_command", side_effect=responses
+                ), contextlib.redirect_stdout(
+                    io.StringIO()
+                ):
+                    self.assertEqual(helper.recovered_rename(RENAME), expected)
+
+    def test_recovery_missing_or_ambiguous_profiles_do_not_pass(self):
+        with patch.dict(
+            os.environ, {}, clear=True
+        ), contextlib.redirect_stdout(io.StringIO()):
+            self.assertFalse(helper.recovered_rename(RENAME))
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "recovery.json"
+            with patch.dict(
+                os.environ, {"BLUEFIELD_EXPECTED_RENAME_RECOVERY": str(source)}
+            ), contextlib.redirect_stdout(io.StringIO()):
+                for profiles in (
+                    [dict(RECOVERY, mac="00:11:22:33:44:55")],
+                    [RECOVERY, RECOVERY],
+                ):
+                    source.write_text(json.dumps(profiles))
+                    self.assertFalse(helper.recovered_rename(RENAME))
+                source.write_text(json.dumps([dict(RECOVERY, mtu="1500")]))
+                with self.assertRaises(ValueError):
+                    helper.recovered_rename(RENAME)
+
+    def test_recovery_required_address_prefix_and_query_failures(self):
+        profile = dict(RECOVERY, addresses=["192.0.2.10/24"])
+        link = {
+            "ifname": "p1",
+            "address": RECOVERY["mac"],
+            "mtu": 1500,
+            "flags": ["UP"],
+            "addr_info": [],
+        }
+        port = {
+            "port": {
+                "port1": {"flavour": "physical", "port": 1, "netdev": "p1"}
+            }
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / "recovery.json"
+            source.write_text(json.dumps([profile]))
+            for entry, expected in (
+                ({"local": "192.0.2.10", "prefixlen": 24}, True),
+                ({"local": "192.0.2.10", "prefixlen": 25}, False),
+                (
+                    {
+                        "local": "192.0.2.10",
+                        "prefixlen": 24,
+                        "tentative": True,
+                    },
+                    False,
+                ),
+            ):
+                responses = [
+                    subprocess.CompletedProcess([], 0, json.dumps(value), "")
+                    for value in ([dict(link, addr_info=[entry])], port)
+                ]
+                with patch.dict(
+                    os.environ,
+                    {"BLUEFIELD_EXPECTED_RENAME_RECOVERY": str(source)},
+                ), patch.object(
+                    helper, "run_command", side_effect=responses
+                ), contextlib.redirect_stdout(
+                    io.StringIO()
+                ):
+                    self.assertEqual(helper.recovered_rename(RENAME), expected)
+            with patch.dict(
+                os.environ, {"BLUEFIELD_EXPECTED_RENAME_RECOVERY": str(source)}
+            ), patch.object(
+                helper,
+                "run_command",
+                return_value=subprocess.CompletedProcess([], 1, "", "denied"),
+            ), contextlib.redirect_stdout(
+                io.StringIO()
+            ):
+                with self.assertRaises(ValueError):
+                    helper.recovered_rename(RENAME)
+
     def run_check(
         self,
         expected="maas",

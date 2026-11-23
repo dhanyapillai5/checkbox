@@ -75,7 +75,28 @@ Acceptance additionally requires `BLUEFIELD_EXPECTED_OOB_ADDRESS` (address/prefi
 and `BLUEFIELD_EXPECTED_OOB_GATEWAY`, supplied from deployment configuration.
 The job discovers the unique `mlxbf_gige` interface and verifies that address
 and default route using read-only, bounded `ip` queries. No lab defaults apply.
-Rename failures, Netplan failures, unrecognised warnings and recoverable
+An exact early `[nic not present]` rename warning can also be retained as a
+warning after final-state verification. `BLUEFIELD_EXPECTED_RENAME_RECOVERY`
+points to a JSON list supplied from reviewed deployment configuration. Example:
+
+```json
+[
+  {"name": "p1", "mac": "aa:bb:cc:dd:ee:ff", "port": 1,
+   "mtu": 1500, "addresses": []}
+]
+```
+
+Each profile describes a directly addressed physical port: exact final name,
+MAC, devlink physical-port number, MTU and non-link-local address/prefix list.
+The interface must be administratively UP, the MAC and role must be unique,
+and the non-link-local addresses must match exactly. IPv6 link-local addresses
+are allowed; `addresses: []` explicitly requires no other L3 addresses, rather
+than skipping verification. Missing/ambiguous profiles, final-state mismatches,
+or failed evidence queries cannot pass. Read-only `ip` and `devlink` queries
+have 30-second timeouts. Profiles do not assert DHCP behaviour, routes, bridge/
+bond membership or connectivity: deployments requiring these need additional
+checks before enabling this exception. Do not derive profiles from live state.
+Other rename failures, Netplan failures, unrecognised warnings and recoverable
 ERROR/CRITICAL entries remain blocking. No blanket deprecation exception exists.
 The job can pass with reporting warnings; it does not claim clean completion.
 Resulting user, SSH-key and network state require separate assertions.
@@ -223,6 +244,7 @@ type = silent
 BLUEFIELD_EXPECTED_DATASOURCE = REPLACE_WITH_DEPLOYMENT_DATASOURCE
 BLUEFIELD_EXPECTED_OOB_ADDRESS = REPLACE_WITH_DEPLOYMENT_OOB_ADDRESS_PREFIX
 BLUEFIELD_EXPECTED_OOB_GATEWAY = REPLACE_WITH_DEPLOYMENT_OOB_GATEWAY
+BLUEFIELD_EXPECTED_RENAME_RECOVERY = /REPLACE_WITH_DEPLOYMENT_PATH/rename-recovery.json
 BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES

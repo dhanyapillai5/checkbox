@@ -7,12 +7,116 @@
 import json
 import ipaddress
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
 from urllib.parse import urlsplit
 
 from bluefield_management import discover_interfaces
+
+RENAME_WARNING = re.compile(
+    r"Failed to rename devices: Failed to apply network config names: "
+    r"\[nic not present\] Cannot rename mac=([0-9a-f]{2}(?::[0-9a-f]{2}){5}) "
+    r"to ([A-Za-z0-9_.-]{1,15}), not available\."
+)
+
+
+def recovered_rename(message):
+    """Verify the configured physical port after a missing-NIC race."""
+    match = RENAME_WARNING.fullmatch(message)
+    if not match:
+        return False
+    source = os.environ.get("BLUEFIELD_EXPECTED_RENAME_RECOVERY", "")
+    if not source:
+        print("FAIL: rename recovery expectations not supplied")
+        return False
+    profiles = json.loads(Path(source).read_text())
+    if not isinstance(profiles, list) or not profiles:
+        raise ValueError("Rename recovery requires a nonempty JSON list")
+    for profile in profiles:
+        if not isinstance(profile, dict) or set(profile) != {
+            "name",
+            "mac",
+            "port",
+            "mtu",
+            "addresses",
+        }:
+            raise ValueError("Invalid rename recovery profile fields")
+        if (
+            not isinstance(profile["name"], str)
+            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", profile["name"])
+            or not isinstance(profile["mac"], str)
+            or not re.fullmatch(
+                r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}", profile["mac"]
+            )
+            or type(profile["port"]) is not int
+            or profile["port"] < 0
+            or type(profile["mtu"]) is not int
+            or profile["mtu"] < 68
+            or not isinstance(profile["addresses"], list)
+        ):
+            raise ValueError("Invalid rename recovery profile values")
+        for value in profile["addresses"]:
+            if not isinstance(value, str) or "/" not in value:
+                raise ValueError("Recovery addresses require address/prefix")
+            address = ipaddress.ip_interface(value)
+            if address.ip.is_link_local or address.ip.is_loopback:
+                raise ValueError(
+                    "Recovery profile lists only non-link-local L3 addresses"
+                )
+    matches = [p for p in profiles if (p["mac"], p["name"]) == match.groups()]
+    if len(matches) != 1:
+        print("FAIL: warning does not match exactly one recovery profile")
+        return False
+    profile = matches[0]
+    print("Expected rename recovery: " + json.dumps(profile, sort_keys=True))
+    links = run_command(["ip", "-j", "address", "show"], 30)
+    ports = run_command(["devlink", "-j", "port", "show"], 30)
+    if links.returncode or ports.returncode:
+        raise ValueError("Unable to collect rename recovery evidence")
+    observed = json.loads(links.stdout)
+    devlink = json.loads(ports.stdout)
+    if not isinstance(observed, list) or not isinstance(devlink, dict):
+        raise ValueError("Invalid recovery observation JSON")
+    identities = [
+        p
+        for p in devlink["port"].values()
+        if (
+            p.get("flavour") == "physical" and p.get("port") == profile["port"]
+        )
+    ]
+    mac_matches = [p for p in observed if p.get("address") == profile["mac"]]
+    named = [p for p in observed if p.get("ifname") == profile["name"]]
+    if (
+        len(identities) != 1
+        or identities[0].get("netdev") != profile["name"]
+        or len(mac_matches) != 1
+        or len(named) != 1
+        or mac_matches[0] != named[0]
+        or named[0].get("mtu") != profile["mtu"]
+        or "UP" not in named[0].get("flags", [])
+    ):
+        print(
+            "FAIL: recovered name/MAC/physical role/MTU/admin state mismatch"
+        )
+        return False
+    addresses = set()
+    for entry in named[0]["addr_info"]:
+        address = ipaddress.ip_interface(
+            "{}/{}".format(entry["local"], entry["prefixlen"])
+        )
+        if address.ip.is_link_local:
+            continue
+        if entry.get("tentative") or entry.get("dadfailed"):
+            return False
+        addresses.add(address)
+    expected = {ipaddress.ip_interface(v) for v in profile["addresses"]}
+    if addresses != expected:
+        print("FAIL: recovered non-link-local addresses differ from profile")
+        return False
+    print("Verified recovered physical port: " + profile["name"])
+    return True
 
 
 def reporting_warning(message, details):
@@ -122,6 +226,8 @@ def check_status(details, status_code, datasource, expected):
     if extended is not None and extended not in ("done", "degraded done"):
         failed = True
     warnings = set()
+    rename_warnings = set()
+    issues = set()
     for section in (
         details,
         *(v for v in details.values() if isinstance(v, dict)),
@@ -143,10 +249,25 @@ def check_status(details, status_code, datasource, expected):
                     message, details
                 ):
                     warnings.add(message)
+                elif category == "WARNING" and RENAME_WARNING.fullmatch(
+                    message
+                ):
+                    rename_warnings.add(message)
                 else:
-                    print("FAIL: unclassified cloud-init issue: " + message)
+                    issues.add(message)
                     failed = True
-    if (status_code == 2 or extended == "degraded done") and not warnings:
+    for message in sorted(issues):
+        print("FAIL: unclassified cloud-init issue: " + message)
+    if not failed and datasource == expected:
+        for message in sorted(rename_warnings):
+            if recovered_rename(message):
+                print("WARNING: recovered early rename issue: " + message)
+            else:
+                print("FAIL: rename recovery not verified: " + message)
+                failed = True
+    if (status_code == 2 or extended == "degraded done") and not (
+        warnings or rename_warnings
+    ):
         failed = True
     if warnings:
         for warning in sorted(warnings):
@@ -164,8 +285,8 @@ def check_status(details, status_code, datasource, expected):
         print(
             "PASS: cloud-init completed with expected datasource"
             + (
-                "; reporting warnings retained, OOB address/route verified"
-                if warnings
+                "; reviewed warnings retained with verified postconditions"
+                if warnings or rename_warnings
                 else "; no recorded errors"
             )
         )
@@ -234,6 +355,7 @@ def main():
         ValueError,
         TypeError,
         AttributeError,
+        KeyError,
     ) as exc:
         print("FAIL: {}".format(exc), file=sys.stderr)
         return 2

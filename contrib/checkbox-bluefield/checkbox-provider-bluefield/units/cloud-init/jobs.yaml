@@ -5,7 +5,8 @@ summary: Verify cloud-init completion and classify recorded issues
 description: |
   Wait up to 120 seconds for cloud-init, then collect JSON status and cloud-id.
   Require completion and BLUEFIELD_EXPECTED_DATASOURCE. Only reviewed early MAAS
-  reporting warnings with verified OOB address/default route can pass. Other
+  reporting warnings with verified OOB address/default route and exact early
+  missing-NIC rename warnings with verified recovery profiles can pass. Other
   issues, timeouts and missing inputs fail. This read-only assertion does not
   establish resulting user, SSH-key or network configuration.
 plugin: shell
@@ -14,4 +15,5 @@ environ:
   - BLUEFIELD_EXPECTED_DATASOURCE
   - BLUEFIELD_EXPECTED_OOB_ADDRESS
   - BLUEFIELD_EXPECTED_OOB_GATEWAY
+  - BLUEFIELD_EXPECTED_RENAME_RECOVERY
 command: bluefield_cloud_init.py
