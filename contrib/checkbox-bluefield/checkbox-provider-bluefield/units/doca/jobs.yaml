@@ -1,0 +1,16 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/doca/device-query
+summary: Verify DOCA device queries and runtime linkage
+description: |
+  Require every BLUEFIELD_EXPECTED_PCI device in doca_caps enumeration and query
+  common capabilities for each. Validate response identity/shape without assuming
+  optional capabilities are supported. Verify representative doca_caps linkage
+  resolves, including libdoca_common and libdoca_argp. Each query is bounded to
+  30 seconds. This does not exercise DMA/RDMA traffic or hardware acceleration.
+plugin: shell
+user: root
+estimated_duration: 3
+environ:
+  - BLUEFIELD_EXPECTED_PCI
+command: bluefield_doca.py
