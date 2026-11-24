@@ -89,6 +89,20 @@ The helper's boot-ready timeout emits a warning and continues; this job does
 not independently assert boot readiness. All three helpers passed direct trials
 on BF3; job execution and reporting through Checkbox remain to be verified.
 
+### Reused kernel-log check (partial S07 coverage)
+
+The smoke plan selects stock `com.canonical.certification::miscellanea/oops`
+and `com.canonical.certification::miscellanea/oops_results.log`. These run the
+FWTS oops check and attach its compressed results. They require `fwts`, the
+`checkbox-support-fwts_test` entry point from the active Python environment and
+`xz`. Missing FWTS or a skipped mandatory job leaves coverage incomplete.
+
+Review test-tool installation changes first and record added package versions;
+preserve the candidate kernel, DOCA and drivers. On Sandbird, the FWTS V24.01.00
+helper passed directly with no oopses or WARN_ON warnings. Execution and log
+attachment through Checkbox remain to be verified. This is not a full firmware
+suite, a general service-log baseline check or complete S07 coverage.
+
 ### Reference inputs for all checks
 
 See [the reference examples](checkbox-provider-bluefield/data/README.md) for all

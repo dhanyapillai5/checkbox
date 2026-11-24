@@ -9,6 +9,8 @@ include:
   - com.canonical.certification::disk/detect
   - com.canonical.certification::memory/info
   - com.canonical.certification::services/no-failed-units
+  - com.canonical.certification::miscellanea/oops
+  - com.canonical.certification::miscellanea/oops_results.log
   - bluefield/cloud-init/completed
   - bluefield/network/deployment-config
   - bluefield/kernel/running-release
