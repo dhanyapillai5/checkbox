@@ -1,0 +1,4 @@
+[
+  {"file": "/etc/example-stack.conf", "key": "EXAMPLE_MODE", "value": "yes"},
+  {"file": "/etc/example-switch.conf", "key": "EXAMPLE_BRIDGES", "value": "no"}
+]

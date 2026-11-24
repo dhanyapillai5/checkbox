@@ -127,6 +127,8 @@ Actual candidate/deployment references remain external run inputs.
 | Cloud-init | `BLUEFIELD_EXPECTED_DATASOURCE`, network reference above | Deployment configuration |
 | DOCA device queries/linkage | `BLUEFIELD_EXPECTED_PCI` | Reviewed required DOCA-device PCI subset |
 | Required service states | `BLUEFIELD_REQUIRED_SERVICES` | Reviewed deployment service policy |
+| Service/timer enablement | `BLUEFIELD_SERVICE_ENABLEMENT` | Pinned candidate enable/disable policy |
+| Configuration settings | `BLUEFIELD_EXPECTED_SETTINGS` | Pinned candidate file/key/value customizations |
 | Tmfifo address | `BLUEFIELD_EXPECTED_TMFIFO_ADDRESS` | Intended image/deployment configuration |
 
 The live six-check trial selected kernel, packages, modules, PCI, interface roles
@@ -282,6 +284,40 @@ reboot; GRUB source files are diagnostic rather than pass criteria.
 For negative trials change only copied launcher expectations. A real mismatch
 with candidate policy must remain a failed result, not be hidden by replacing
 expectations with the observed command line.
+
+### Service enablement and configuration settings (partial S09 coverage)
+
+`bluefield/services/enablement` takes `BLUEFIELD_SERVICE_ENABLEMENT` as a
+nonempty whitespace-separated list of unique `unit.service:enabled|disabled` or
+`unit.timer:enabled|disabled` tokens. Each unit is queried separately with
+read-only `systemctl is-enabled` and a 30-second timeout, so stdout belongs to
+one known identity. SysV-backed services are supported; redirection diagnostics
+are retained on stderr. Exact `enabled` requires exit 0 and exact `disabled`
+requires exit 1. Missing, static, masked, runtime-only and other states fail.
+Units are not started, stopped, enabled or disabled. Runtime state and functional
+health remain separate assertions.
+
+`bluefield/image/config-settings` takes `BLUEFIELD_EXPECTED_SETTINGS`, an
+absolute path to a nonempty JSON list of objects with exactly three string
+fields: `file` (normalized absolute path), `key` (assignment name), and `value`
+(expected literal string). File/key pairs must be unique. See the
+[synthetic example](checkbox-provider-bluefield/data/image/expected-settings.json).
+The job reads files as root and requires exactly one assignment for each selected
+key. Single/double quotes, optional `export`, surrounding assignment whitespace
+and trailing comments are accepted; values are compared after quote removal.
+Missing keys, duplicate assignments, mismatches and read errors fail. Shell
+expansion, command substitution, semicolons and backslash continuations are
+unsupported and fail explicitly. Files are never sourced or executed. This is
+literal file-content validation, not a general shell parser or proof that a
+running service consumed these settings.
+
+Derive both inputs from the pinned candidate customization and reviewed deployment
+policy, independently of observed state; neither job has built-in expectations.
+Expectations and observations are retained in output. For this MAAS profile the
+settings are `FORCE_MODE=yes`, `CREATE_OVS_BRIDGES=no`, and `OVS_DOCA=yes`.
+Manual Sandbird queries matched six enabled units, seven disabled units and all
+three settings; live execution of these new jobs is pending. Exercise negative
+trials by changing only copied expectations, not live service/configuration state.
 
 ### Cloud-init completion diagnostics
 
@@ -460,6 +496,8 @@ BLUEFIELD_ABSENT_FILES = REPLACE_WITH_CANDIDATE_REMOVED_ABSOLUTE_PATHS
 BLUEFIELD_EXPECTED_RELEASE_SUFFIX = REPLACE_WITH_CANDIDATE_RELEASE_SUFFIX
 BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
 BLUEFIELD_REQUIRED_SERVICES = openibd.service:active:exited ovsdb-server.service:active:running ovs-vswitchd.service:active:running
+BLUEFIELD_SERVICE_ENABLEMENT = REPLACE_WITH_CANDIDATE_UNIT_STATE_TOKENS
+BLUEFIELD_EXPECTED_SETTINGS = /REPLACE_WITH_CANDIDATE_PATH/expected-settings.json
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv
 BLUEFIELD_EXPECTED_INTERFACES = /REPLACE_WITH_DPU_CONFIG_PATH/expected-interfaces.json
 BLUEFIELD_EXPECTED_MANAGEMENT = /REPLACE_WITH_DPU_CONFIG_PATH/expected-management.json

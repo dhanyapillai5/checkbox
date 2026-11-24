@@ -15,6 +15,8 @@ include:
   - bluefield/network/deployment-config
   - bluefield/doca/device-query
   - bluefield/services/required-state
+  - bluefield/services/enablement
+  - bluefield/image/config-settings
   - bluefield/kernel/running-release
   - bluefield/kernel/boot-arguments
   - bluefield/packages/required-inventory
