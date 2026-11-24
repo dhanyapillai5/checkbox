@@ -113,6 +113,7 @@ Actual candidate/deployment references remain external run inputs.
 | Check | Launcher input | Authoritative source |
 |---|---|---|
 | Kernel release | `BLUEFIELD_EXPECTED_KERNEL` | Candidate build or selected kernel candidate |
+| Running boot arguments | `BLUEFIELD_REQUIRED_BOOT_ARGS`, `BLUEFIELD_FORBIDDEN_BOOT_ARGS` | Pinned candidate customization and reviewed deployment policy |
 | Required packages | `BLUEFIELD_CANDIDATE_INVENTORY`, `BLUEFIELD_REQUIRED_PACKAGES` | Candidate inventory and reviewed required subset |
 | Required package holds | `BLUEFIELD_REQUIRED_HOLDS` | Candidate's pinned customization hold policy |
 | Installed Conflicts fields | `BLUEFIELD_EXPECTED_CONFLICTS` | Candidate's pinned package-customization metadata |
@@ -259,6 +260,28 @@ queries confirmed four policy files absent and the intended release suffix;
 live execution of these new Checkbox jobs remains pending. Exercise negatives
 only through copied expectations, never by recreating removed files or editing
 the installed release marker.
+
+### Running boot arguments (partial S09 coverage)
+
+`bluefield/kernel/boot-arguments` reads `/proc/cmdline` and requires every
+whitespace-separated token in `BLUEFIELD_REQUIRED_BOOT_ARGS`. It rejects every
+token in `BLUEFIELD_FORBIDDEN_BOOT_ARGS` (which may be empty). Inputs must be
+unique within each list, disjoint and supplied independently from the pinned
+candidate customization and reviewed deployment policy. No defaults are built in.
+
+Matching uses complete tokens, including values, and allows extra deployment
+arguments such as `root=UUID=...`. Multiple console expectations are supported.
+Tokens following a standalone `--` are init arguments and excluded. This initial
+format supports whitespace-free tokens, not quoted values containing spaces.
+It asserts token presence/absence, not precedence of conflicting values for the
+same parameter. Missing required input, invalid expectations, empty/multiline or
+unreadable command lines and mismatches fail. Expected and observed arguments
+are retained in output. The check does not edit GRUB, regenerate boot entries or
+reboot; GRUB source files are diagnostic rather than pass criteria.
+
+For negative trials change only copied launcher expectations. A real mismatch
+with candidate policy must remain a failed result, not be hidden by replacing
+expectations with the observed command line.
 
 ### Cloud-init completion diagnostics
 
@@ -427,6 +450,8 @@ type = silent
 BLUEFIELD_EXPECTED_DATASOURCE = REPLACE_WITH_DEPLOYMENT_DATASOURCE
 BLUEFIELD_MAAS_NETWORK_CONFIG = /REPLACE_WITH_REFERENCE_PATH/maas-network-reference.yaml
 BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
+BLUEFIELD_REQUIRED_BOOT_ARGS = REPLACE_WITH_CANDIDATE_REQUIRED_BOOT_ARGUMENTS
+BLUEFIELD_FORBIDDEN_BOOT_ARGS = REPLACE_WITH_CANDIDATE_FORBIDDEN_BOOT_ARGUMENTS
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
 BLUEFIELD_REQUIRED_HOLDS = REPLACE_WITH_CANDIDATE_REQUIRED_HOLD_NAMES

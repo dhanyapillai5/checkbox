@@ -16,6 +16,7 @@ include:
   - bluefield/doca/device-query
   - bluefield/services/required-state
   - bluefield/kernel/running-release
+  - bluefield/kernel/boot-arguments
   - bluefield/packages/required-inventory
   - bluefield/packages/required-holds
   - bluefield/packages/expected-conflicts
