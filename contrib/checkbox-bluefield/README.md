@@ -116,6 +116,8 @@ Actual candidate/deployment references remain external run inputs.
 | Required packages | `BLUEFIELD_CANDIDATE_INVENTORY`, `BLUEFIELD_REQUIRED_PACKAGES` | Candidate inventory and reviewed required subset |
 | Required package holds | `BLUEFIELD_REQUIRED_HOLDS` | Candidate's pinned customization hold policy |
 | Installed Conflicts fields | `BLUEFIELD_EXPECTED_CONFLICTS` | Candidate's pinned package-customization metadata |
+| Removed files | `BLUEFIELD_ABSENT_FILES` | Candidate's pinned deployed-file removal policy |
+| Release marker | `BLUEFIELD_EXPECTED_RELEASE_SUFFIX` | Candidate's pinned release-marker customization |
 | Loaded modules | `BLUEFIELD_REQUIRED_MODULES` | Required platform/stack configuration |
 | PCI bindings | `BLUEFIELD_EXPECTED_PCI` | Reviewed hardware profile |
 | Interface/representor roles | `BLUEFIELD_EXPECTED_INTERFACES` | Reviewed deployment topology |
@@ -234,6 +236,29 @@ execution of the new jobs remains pending; earlier manual queries are separate
 evidence. For a focused trial, select these two jobs from `bluefield-image-smoke`.
 Exercise negatives by changing only a copied expectation (for example a
 nonexistent required hold or wrong conflict version), then restore the reference.
+
+### Removed files and release marker (partial S09 coverage)
+
+`bluefield/image/absent-files` requires a nonempty whitespace-separated list of
+unique normalized absolute paths in `BLUEFIELD_ABSENT_FILES`. Every path must be
+absent, including dangling symlinks. Permission errors and invalid parent paths
+fail rather than being treated as absence. The job runs as root to inspect the
+required paths. Derive the list from the candidate's pinned customization policy;
+do not include build-only files that are not deployed-image requirements.
+
+`bluefield/image/release-marker` reads `/etc/mlnx-release` as root and requires
+one whitespace-free identifier ending with `BLUEFIELD_EXPECTED_RELEASE_SUFFIX`.
+Supply a nonempty suffix beginning with `_` from the candidate customization
+policy. This verifies the intended suffix, not the complete bundle version. For
+the DOCA 3.6.0 MAAS customization, the source replaces the NVIDIA suffix with
+`_packer_maas`; the reusable checker has no built-in expected suffix.
+
+Both jobs are read-only and fail for missing or invalid inputs and read errors.
+Retain the launcher and pinned policy source with reports. Manual Sandbird
+queries confirmed four policy files absent and the intended release suffix;
+live execution of these new Checkbox jobs remains pending. Exercise negatives
+only through copied expectations, never by recreating removed files or editing
+the installed release marker.
 
 ### Cloud-init completion diagnostics
 
@@ -406,6 +431,8 @@ BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.t
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
 BLUEFIELD_REQUIRED_HOLDS = REPLACE_WITH_CANDIDATE_REQUIRED_HOLD_NAMES
 BLUEFIELD_EXPECTED_CONFLICTS = /REPLACE_WITH_CANDIDATE_PATH/expected-conflicts.tsv
+BLUEFIELD_ABSENT_FILES = REPLACE_WITH_CANDIDATE_REMOVED_ABSOLUTE_PATHS
+BLUEFIELD_EXPECTED_RELEASE_SUFFIX = REPLACE_WITH_CANDIDATE_RELEASE_SUFFIX
 BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
 BLUEFIELD_REQUIRED_SERVICES = openibd.service:active:exited ovsdb-server.service:active:running ovs-vswitchd.service:active:running
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv

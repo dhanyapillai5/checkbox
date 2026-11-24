@@ -19,6 +19,8 @@ include:
   - bluefield/packages/required-inventory
   - bluefield/packages/required-holds
   - bluefield/packages/expected-conflicts
+  - bluefield/image/absent-files
+  - bluefield/image/release-marker
   - bluefield/modules/required-loaded
   - bluefield/pci/expected-bindings
   - bluefield/interfaces/expected-roles
