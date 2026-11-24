@@ -114,6 +114,8 @@ Actual candidate/deployment references remain external run inputs.
 |---|---|---|
 | Kernel release | `BLUEFIELD_EXPECTED_KERNEL` | Candidate build or selected kernel candidate |
 | Required packages | `BLUEFIELD_CANDIDATE_INVENTORY`, `BLUEFIELD_REQUIRED_PACKAGES` | Candidate inventory and reviewed required subset |
+| Required package holds | `BLUEFIELD_REQUIRED_HOLDS` | Candidate's pinned customization hold policy |
+| Installed Conflicts fields | `BLUEFIELD_EXPECTED_CONFLICTS` | Candidate's pinned package-customization metadata |
 | Loaded modules | `BLUEFIELD_REQUIRED_MODULES` | Required platform/stack configuration |
 | PCI bindings | `BLUEFIELD_EXPECTED_PCI` | Reviewed hardware profile |
 | Interface/representor roles | `BLUEFIELD_EXPECTED_INTERFACES` | Reviewed deployment topology |
@@ -200,6 +202,38 @@ offload configuration or functional traffic. The installed tools and both common
 device queries were exercised manually on Sandbird; the new Checkbox jobs still
 need a live trial. This initial S08 slice does not prove DMA/RDMA functionality,
 hardware acceleration or unselected DOCA libraries/services.
+
+### Package customizations (partial S09 coverage)
+
+`bluefield/packages/required-holds` takes `BLUEFIELD_REQUIRED_HOLDS` as a
+nonempty, whitespace-separated list of unique, unqualified Debian package names.
+It runs read-only `apt-mark showhold` and requires every listed name to be held.
+Extra holds are allowed. Resolve versioned kernel package names from the
+candidate's pinned customization/release configuration, never `uname` or live
+APT state. There are no built-in package names or version defaults.
+
+`bluefield/packages/expected-conflicts` takes `BLUEFIELD_EXPECTED_CONFLICTS`,
+an absolute path to a nonempty, headerless UTF-8 TSV file. Each row has two fields:
+unique unqualified package name and the exact expected nonempty `Conflicts`
+field. See the [synthetic example](checkbox-provider-bluefield/data/packages/expected-conflicts.tsv).
+Prepare this reference from the candidate's pinned customization/release policy;
+do not export installed DPU metadata to construct passing expectations.
+
+The job queries only listed packages with read-only `dpkg-query`, requires fully
+installed status and compares the entire `Conflicts` field exactly, including
+operators, versions, ordering and spacing. Missing, unversioned, changed or
+additional conflicts in a selected package fail. Unselected packages are outside
+this assertion. Missing/unreadable/invalid inputs and failed or timed-out queries
+fail both jobs. Commands have 30-second timeouts and retain expectations and
+observations in job output. Neither job changes holds or package state.
+
+Keep the reference, launcher, candidate identity and pinned source revision with
+the reports. These checks cover holds and installed conflict metadata, not APT
+dependency resolution, upgrade simulation or all S09 customizations. Live
+execution of the new jobs remains pending; earlier manual queries are separate
+evidence. For a focused trial, select these two jobs from `bluefield-image-smoke`.
+Exercise negatives by changing only a copied expectation (for example a
+nonexistent required hold or wrong conflict version), then restore the reference.
 
 ### Cloud-init completion diagnostics
 
@@ -370,6 +404,8 @@ BLUEFIELD_MAAS_NETWORK_CONFIG = /REPLACE_WITH_REFERENCE_PATH/maas-network-refere
 BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
+BLUEFIELD_REQUIRED_HOLDS = REPLACE_WITH_CANDIDATE_REQUIRED_HOLD_NAMES
+BLUEFIELD_EXPECTED_CONFLICTS = /REPLACE_WITH_CANDIDATE_PATH/expected-conflicts.tsv
 BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
 BLUEFIELD_REQUIRED_SERVICES = openibd.service:active:exited ovsdb-server.service:active:running ovs-vswitchd.service:active:running
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv

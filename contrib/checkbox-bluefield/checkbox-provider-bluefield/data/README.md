@@ -8,13 +8,14 @@ relative to `PLAINBOX_PROVIDER_DATA`.
 | File | Purpose and real-run source |
 |---|---|
 | `packages/package-inventory.tsv` | Synthetic package/version/architecture row. Use the actual candidate build's inventory, not a DPU package export. |
+| `packages/expected-conflicts.tsv` | Synthetic package/exact Conflicts TSV. Derive fields from the candidate's pinned customization/release policy, not installed DPU metadata. |
 | `pci/expected-pci.tsv` | Illustrative two-function BF3 profile. Confirm PCI addresses, IDs and bindings against the reviewed target hardware profile. |
 | `management/expected-management.json` | Illustrates OOB and tmfifo driver identities; review against the required platform configuration. |
 | `interfaces/expected-interfaces.json` | Two physical ports and two host-PF representors, matching the scope of the six-check trial. SF roles are intentionally absent from this example, so it cannot establish full representor coverage. |
 | `network/maas-network-reference.yaml` | Synthetic MAAS Netplan format with dummy MACs and documentation IP addresses. Replace with the original MAAS-generated deployment reference. |
 
 Not every expectation needs a file. The launcher supplies the expected kernel,
-required package/module lists, expected datasource and required tmfifo
+required package/module/hold lists, expected datasource and required tmfifo
 address/prefix directly. Their authoritative sources and a full launcher example
 are documented in the [provider README](../../README.md#running-the-smoke-plan).
 
@@ -26,6 +27,7 @@ Keep actual run inputs outside the source checkout, for example:
 ~/bluefield-validation/<run-id>/
 ├── references/
 │   ├── package-inventory.tsv
+│   ├── expected-conflicts.tsv
 │   ├── expected-pci.tsv
 │   ├── expected-management.json
 │   ├── expected-interfaces.json

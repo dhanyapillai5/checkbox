@@ -17,6 +17,8 @@ include:
   - bluefield/services/required-state
   - bluefield/kernel/running-release
   - bluefield/packages/required-inventory
+  - bluefield/packages/required-holds
+  - bluefield/packages/expected-conflicts
   - bluefield/modules/required-loaded
   - bluefield/pci/expected-bindings
   - bluefield/interfaces/expected-roles
