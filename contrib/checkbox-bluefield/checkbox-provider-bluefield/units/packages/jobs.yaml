@@ -13,3 +13,29 @@ environ:
   - BLUEFIELD_CANDIDATE_INVENTORY
   - BLUEFIELD_REQUIRED_PACKAGES
 command: bluefield_packages.py
+---
+id: bluefield/packages/required-holds
+summary: Verify the candidate's required package holds
+description: |
+  Require every package in BLUEFIELD_REQUIRED_HOLDS to appear in apt-mark
+  showhold. Supply the list from the candidate's pinned customization policy.
+  Extra holds are allowed. Missing or invalid input and query failures fail
+  this read-only check; no holds are changed.
+plugin: shell
+estimated_duration: 1
+environ:
+  - BLUEFIELD_REQUIRED_HOLDS
+command: bluefield_package_holds.py
+---
+id: bluefield/packages/expected-conflicts
+summary: Verify installed package Conflicts match candidate metadata
+description: |
+  Read package and exact Conflicts fields from BLUEFIELD_EXPECTED_CONFLICTS,
+  an independent candidate-derived TSV reference. Require fully installed
+  packages with matching fields. Missing or invalid inputs, mismatches and
+  query failures fail this read-only check; no packages are changed.
+plugin: shell
+estimated_duration: 1
+environ:
+  - BLUEFIELD_EXPECTED_CONFLICTS
+command: bluefield_package_conflicts.py
