@@ -1,0 +1,15 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/image/config-settings
+summary: Verify candidate configuration settings
+description: |
+  BLUEFIELD_EXPECTED_SETTINGS is an absolute path to an independent JSON list of
+  file/key/value expectations. Require one literal assignment per selected key
+  with the expected value. Missing, duplicate, nonliteral or mismatched settings
+  fail. Read files without sourcing shell code or changing configuration.
+plugin: shell
+user: root
+estimated_duration: 1
+environ:
+  - BLUEFIELD_EXPECTED_SETTINGS
+command: bluefield_config_settings.py
