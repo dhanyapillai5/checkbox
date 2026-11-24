@@ -1,0 +1,12 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: services/no-failed-units
+summary: Verify no systemd units are failed
+description: |
+  Reuse the service-only check from the reboot helper without initiating a
+  reboot. Fail if systemd lists failed units or evidence collection fails.
+  This does not assert that every required service is installed or active.
+plugin: shell
+user: root
+estimated_duration: 2
+command: timeout 180 reboot_check_test.py --service-check
