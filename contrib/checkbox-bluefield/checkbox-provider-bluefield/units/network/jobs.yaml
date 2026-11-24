@@ -1,0 +1,17 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/network/deployment-config
+summary: Verify MAAS-generated Ethernet configuration is enforced
+description: |
+  Compare MAAS-generated Netplan with live interface identities, admin state,
+  explicitly configured MTUs, static addresses and required routes. Reads
+  the independent MAAS reference supplied by BLUEFIELD_MAAS_NETWORK_CONFIG.
+  Requires an absolute reference path and MAAS cloud-id. No local default.
+  Unsupported topologies and dynamic addressing fail explicitly. DNS, users,
+  SSH keys, connectivity and original-input provenance require separate checks.
+plugin: shell
+user: root
+estimated_duration: 2
+environ:
+  - BLUEFIELD_MAAS_NETWORK_CONFIG
+command: bluefield_network_config.py
