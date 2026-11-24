@@ -5,15 +5,14 @@
 """Assert cloud-init completion with narrowly guarded reporting warnings."""
 
 import json
-import ipaddress
 import os
-from pathlib import Path
 import re
 import subprocess
 import sys
 from urllib.parse import urlsplit
 
-from bluefield_management import discover_interfaces
+from bluefield_network_config import verify_deployment_network
+import yaml
 
 RENAME_WARNING = re.compile(
     r"Failed to rename devices: Failed to apply network config names: "
@@ -23,100 +22,11 @@ RENAME_WARNING = re.compile(
 
 
 def recovered_rename(message):
-    """Verify the configured physical port after a missing-NIC race."""
+    """Require the warned identity in verified MAAS network configuration."""
     match = RENAME_WARNING.fullmatch(message)
     if not match:
         return False
-    source = os.environ.get("BLUEFIELD_EXPECTED_RENAME_RECOVERY", "")
-    if not source:
-        print("FAIL: rename recovery expectations not supplied")
-        return False
-    profiles = json.loads(Path(source).read_text())
-    if not isinstance(profiles, list) or not profiles:
-        raise ValueError("Rename recovery requires a nonempty JSON list")
-    for profile in profiles:
-        if not isinstance(profile, dict) or set(profile) != {
-            "name",
-            "mac",
-            "port",
-            "mtu",
-            "addresses",
-        }:
-            raise ValueError("Invalid rename recovery profile fields")
-        if (
-            not isinstance(profile["name"], str)
-            or not re.fullmatch(r"[A-Za-z0-9_.-]{1,15}", profile["name"])
-            or not isinstance(profile["mac"], str)
-            or not re.fullmatch(
-                r"[0-9a-f]{2}(?::[0-9a-f]{2}){5}", profile["mac"]
-            )
-            or type(profile["port"]) is not int
-            or profile["port"] < 0
-            or type(profile["mtu"]) is not int
-            or profile["mtu"] < 68
-            or not isinstance(profile["addresses"], list)
-        ):
-            raise ValueError("Invalid rename recovery profile values")
-        for value in profile["addresses"]:
-            if not isinstance(value, str) or "/" not in value:
-                raise ValueError("Recovery addresses require address/prefix")
-            address = ipaddress.ip_interface(value)
-            if address.ip.is_link_local or address.ip.is_loopback:
-                raise ValueError(
-                    "Recovery profile lists only non-link-local L3 addresses"
-                )
-    matches = [p for p in profiles if (p["mac"], p["name"]) == match.groups()]
-    if len(matches) != 1:
-        print("FAIL: warning does not match exactly one recovery profile")
-        return False
-    profile = matches[0]
-    print("Expected rename recovery: " + json.dumps(profile, sort_keys=True))
-    links = run_command(["ip", "-j", "address", "show"], 30)
-    ports = run_command(["devlink", "-j", "port", "show"], 30)
-    if links.returncode or ports.returncode:
-        raise ValueError("Unable to collect rename recovery evidence")
-    observed = json.loads(links.stdout)
-    devlink = json.loads(ports.stdout)
-    if not isinstance(observed, list) or not isinstance(devlink, dict):
-        raise ValueError("Invalid recovery observation JSON")
-    identities = [
-        p
-        for p in devlink["port"].values()
-        if (
-            p.get("flavour") == "physical" and p.get("port") == profile["port"]
-        )
-    ]
-    mac_matches = [p for p in observed if p.get("address") == profile["mac"]]
-    named = [p for p in observed if p.get("ifname") == profile["name"]]
-    if (
-        len(identities) != 1
-        or identities[0].get("netdev") != profile["name"]
-        or len(mac_matches) != 1
-        or len(named) != 1
-        or mac_matches[0] != named[0]
-        or named[0].get("mtu") != profile["mtu"]
-        or "UP" not in named[0].get("flags", [])
-    ):
-        print(
-            "FAIL: recovered name/MAC/physical role/MTU/admin state mismatch"
-        )
-        return False
-    addresses = set()
-    for entry in named[0]["addr_info"]:
-        address = ipaddress.ip_interface(
-            "{}/{}".format(entry["local"], entry["prefixlen"])
-        )
-        if address.ip.is_link_local:
-            continue
-        if entry.get("tentative") or entry.get("dadfailed"):
-            return False
-        addresses.add(address)
-    expected = {ipaddress.ip_interface(v) for v in profile["addresses"]}
-    if addresses != expected:
-        print("FAIL: recovered non-link-local addresses differ from profile")
-        return False
-    print("Verified recovered physical port: " + profile["name"])
-    return True
+    return match.groups() in verify_deployment_network()
 
 
 def reporting_warning(message, details):
@@ -154,60 +64,19 @@ def reporting_warning(message, details):
 
 
 def management_ready():
-    """Verify independent address/prefix and default gateway on the OOB NIC."""
-    value = os.environ.get("BLUEFIELD_EXPECTED_OOB_ADDRESS", "")
-    if "/" not in value:
-        raise ValueError(
-            "Supply BLUEFIELD_EXPECTED_OOB_ADDRESS address/prefix"
-        )
-    address = ipaddress.ip_interface(value)
-    gateway = ipaddress.ip_address(
-        os.environ.get("BLUEFIELD_EXPECTED_OOB_GATEWAY", "")
-    )
-    if address.version != gateway.version:
-        raise ValueError("OOB address and gateway families differ")
-    matches = [
-        name
-        for name, identity in discover_interfaces().items()
-        if identity["driver"] == "mlxbf_gige"
-    ]
-    if len(matches) != 1:
-        return False
-    name = matches[0]
-    addresses = run_command(["ip", "-j", "address", "show", "dev", name], 30)
-    routes = run_command(
-        [
-            "ip",
-            "-j",
-            "-{}".format(address.version),
-            "route",
-            "show",
-            "default",
-        ],
-        30,
-    )
-    if addresses.returncode or routes.returncode:
-        raise ValueError("Unable to query management address/default route")
-    assigned = any(
-        item.get("ifname") == name
+    """Require enforced deployment addressing and a default route."""
+    from bluefield_network_config import load_config
+
+    profiles = load_config()
+    if not any(
+        p["addresses"]
         and any(
-            entry.get("local") == str(address.ip)
-            and entry.get("prefixlen") == address.network.prefixlen
-            and not entry.get("tentative", False)
-            and not entry.get("dadfailed", False)
-            for entry in item.get("addr_info", [])
+            r["to"] in ("default", "0.0.0.0/0", "::/0") for r in p["routes"]
         )
-        for item in json.loads(addresses.stdout)
-    )
-    routed = any(
-        item.get("dst") == "default"
-        and item.get("dev") == name
-        and item.get("gateway") == str(gateway)
-        and item.get("type", "unicast") == "unicast"
-        for item in json.loads(routes.stdout)
-    )
-    print("Expected OOB on {}: {}; gateway {}".format(name, address, gateway))
-    return assigned and routed
+        for p in profiles
+    ):
+        raise ValueError("MAAS reporting guard requires address/default route")
+    return bool(verify_deployment_network())
 
 
 def check_status(details, status_code, datasource, expected):
@@ -274,7 +143,7 @@ def check_status(details, status_code, datasource, expected):
             print("WARNING: " + warning)
         if not failed and datasource == expected == "maas":
             if not management_ready():
-                print("FAIL: required OOB address/default route not verified")
+                print("FAIL: deployment address/default route not verified")
                 failed = True
     if failed:
         print("FAIL: cloud-init has not completed cleanly")
@@ -356,6 +225,7 @@ def main():
         TypeError,
         AttributeError,
         KeyError,
+        yaml.YAMLError,
     ) as exc:
         print("FAIL: {}".format(exc), file=sys.stderr)
         return 2
