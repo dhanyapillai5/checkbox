@@ -6,6 +6,9 @@ name: BlueField image smoke
 description: |
   Run single-DPU image checks.
 include:
+  - com.canonical.certification::disk/detect
+  - com.canonical.certification::memory/info
+  - com.canonical.certification::services/no-failed-units
   - bluefield/cloud-init/completed
   - bluefield/network/deployment-config
   - bluefield/kernel/running-release
@@ -15,3 +18,5 @@ include:
   - bluefield/interfaces/expected-roles
   - bluefield/management/expected-interfaces
   - bluefield/management/tmfifo-address
+bootstrap_include:
+  - com.canonical.certification::executable

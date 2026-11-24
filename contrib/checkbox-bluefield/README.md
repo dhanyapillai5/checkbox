@@ -17,8 +17,9 @@ For provider authoring, see the
 
 ## Requirements and source installation
 
-Provider management requires `checkbox-ng`. This provider does not depend on
-stock providers or `checkbox-support`. Use a dedicated Python virtual
+Provider management requires `checkbox-ng`. The smoke plan also requires the
+base and resource providers and `checkbox-support` for reused platform checks.
+Use a dedicated Python virtual
 environment. On Ubuntu, install matching venv support first: importing `venv`
 alone does not establish that `ensurepip` is available. Ubuntu 24.04 with the
 default Python 3.12 needs `python3.12-venv`.
@@ -34,7 +35,7 @@ python3 -m venv "$HOME/bluefield-checkbox-venv"
 ```
 
 ```bash
-python3 -m pip install ./checkbox-ng
+python3 -m pip install ./checkbox-ng ./checkbox-support
 ```
 
 Register the provider:
@@ -55,9 +56,38 @@ mkdir -p "$PROVIDERPATH"
 python3 "$P/manage.py" develop -d "$PROVIDERPATH"
 ```
 
+Register the stock providers from the same checkout as well:
+
+```bash
+python3 providers/resource/manage.py develop -d "$PROVIDERPATH"
+```
+
+```bash
+python3 providers/base/manage.py develop -d "$PROVIDERPATH"
+```
+
 Keep the same environment and `PROVIDERPATH` when invoking Checkbox.
 
 ## Running the smoke plan
+
+### Reused platform checks (partial S05 coverage)
+
+The smoke plan selects `com.canonical.certification::disk/detect`,
+`com.canonical.certification::memory/info` and
+`com.canonical.certification::services/no-failed-units`. The executable resource
+is bootstrapped for disk discovery. Missing mandatory tools/providers or
+unexpected skips must be treated as incomplete coverage, not a passing smoke.
+The image needs `lsblk`, `lshw`, `systemctl` and `timeout` available. Do not
+replace image packages to obtain test dependencies.
+
+Disk detection confirms discovery, not expected disk identity or filesystem
+health. Memory comparison uses the stock hardware-versus-visible-memory policy,
+not a memory stress test. The generic base-provider service job reuses
+`reboot_check_test.py --service-check` with an overall 180-second timeout and
+does not reboot. It detects failed units, not missing/inactive required services.
+The helper's boot-ready timeout emits a warning and continues; this job does
+not independently assert boot readiness. All three helpers passed direct trials
+on BF3; job execution and reporting through Checkbox remain to be verified.
 
 ### Reference inputs for all checks
 
