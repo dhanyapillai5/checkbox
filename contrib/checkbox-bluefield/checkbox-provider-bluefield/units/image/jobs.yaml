@@ -1,0 +1,29 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/image/absent-files
+summary: Verify candidate policy files were removed
+description: |
+  Require all normalized absolute paths in BLUEFIELD_ABSENT_FILES to be absent.
+  Supply a whitespace-separated list from the candidate customization policy.
+  Existing files, directories and dangling symlinks fail. Read errors and missing
+  or invalid expectations fail. Does not remove or change any files.
+plugin: shell
+user: root
+estimated_duration: 1
+environ:
+  - BLUEFIELD_ABSENT_FILES
+command: bluefield_image_files.py absent
+---
+id: bluefield/image/release-marker
+summary: Verify the candidate release marker suffix
+description: |
+  Require /etc/mlnx-release to contain one nonempty release identifier ending
+  with BLUEFIELD_EXPECTED_RELEASE_SUFFIX. Supply the suffix from the candidate's
+  pinned customization policy, not the observed release file. Missing or invalid
+  inputs, unreadable files and mismatches fail this read-only check.
+plugin: shell
+user: root
+estimated_duration: 1
+environ:
+  - BLUEFIELD_EXPECTED_RELEASE_SUFFIX
+command: bluefield_image_files.py release
