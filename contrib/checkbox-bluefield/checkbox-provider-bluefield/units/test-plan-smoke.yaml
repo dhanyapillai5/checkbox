@@ -7,6 +7,7 @@ description: |
   Run single-DPU image checks.
 include:
   - bluefield/cloud-init/completed
+  - bluefield/network/deployment-config
   - bluefield/kernel/running-release
   - bluefield/packages/required-inventory
   - bluefield/modules/required-loaded
