@@ -1,0 +1,16 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/kernel/boot-arguments
+summary: Verify running kernel arguments match candidate policy
+description: |
+  Require every token in BLUEFIELD_REQUIRED_BOOT_ARGS and reject every token
+  in BLUEFIELD_FORBIDDEN_BOOT_ARGS in /proc/cmdline, before any -- separator.
+  Supply independent candidate/deployment policy inputs. Extra arguments are
+  allowed; matching is by complete token. Missing required input, invalid
+  expectations, read failures and mismatches fail this read-only check.
+plugin: shell
+estimated_duration: 1
+environ:
+  - BLUEFIELD_REQUIRED_BOOT_ARGS
+  - BLUEFIELD_FORBIDDEN_BOOT_ARGS
+command: bluefield_boot_args.py
