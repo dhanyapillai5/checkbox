@@ -120,6 +120,8 @@ Actual candidate/deployment references remain external run inputs.
 | Management interfaces | `BLUEFIELD_EXPECTED_MANAGEMENT` | Required backing-driver identities |
 | Network configuration | `BLUEFIELD_MAAS_NETWORK_CONFIG` | Independent original MAAS deployment Netplan |
 | Cloud-init | `BLUEFIELD_EXPECTED_DATASOURCE`, network reference above | Deployment configuration |
+| DOCA device queries/linkage | `BLUEFIELD_EXPECTED_PCI` | Reviewed required DOCA-device PCI subset |
+| Required service states | `BLUEFIELD_REQUIRED_SERVICES` | Reviewed deployment service policy |
 | Tmfifo address | `BLUEFIELD_EXPECTED_TMFIFO_ADDRESS` | Intended image/deployment configuration |
 
 The live six-check trial selected kernel, packages, modules, PCI, interface roles
@@ -165,6 +167,39 @@ reference as an explicit input. There is no fallback to installed DPU Netplan.
 Do not generate the reference from DPU configuration or `ip` output. For
 kernel regression, retain the same deployment input across kernel installation
 and reboot, and run this check again.
+
+### DOCA device-query and service smoke (partial S08 coverage)
+
+`bluefield/doca/device-query` uses the existing `BLUEFIELD_EXPECTED_PCI` TSV
+as the required DOCA-device subset. Every listed device must appear uniquely in
+`doca_caps --list-devs --format json`, and a per-device `--lib common` query
+must return valid supported/unsupported capabilities for that exact identity.
+Extra enumerated devices are allowed; optional unsupported capabilities are not
+failures. Supply only required DOCA devices, not unrelated PCI devices.
+
+The job also runs `ldd` on the installed `doca_caps`, requires no unresolved
+dependencies and verifies resolved `libdoca_common`/`libdoca_argp` entries. This
+is representative linkage, not validation of every installed library or ABI.
+Each external command has a 30-second timeout, retains output and must succeed.
+The fixed tool path is `/opt/mellanox/doca/tools/doca_caps`; no benchmarks,
+compilation, traffic or configuration changes are performed. Queries run as root.
+
+`bluefield/services/required-state` reads `BLUEFIELD_REQUIRED_SERVICES` as
+whitespace-separated `unit.service:active:running` or
+`unit.service:active:exited` expectations. Units must be loaded, match both
+runtime states and have `Result=success`. Missing input/units and failed or
+timed-out observations fail. There are no built-in service defaults. Example
+policy for this deployment:
+
+```ini
+BLUEFIELD_REQUIRED_SERVICES = openibd.service:active:exited ovsdb-server.service:active:running ovs-vswitchd.service:active:running
+```
+
+Service state does not establish historical retries, enablement, OVS bridge/
+offload configuration or functional traffic. The installed tools and both common
+device queries were exercised manually on Sandbird; the new Checkbox jobs still
+need a live trial. This initial S08 slice does not prove DMA/RDMA functionality,
+hardware acceleration or unselected DOCA libraries/services.
 
 ### Cloud-init completion diagnostics
 
@@ -336,6 +371,7 @@ BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES
 BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfifo ib_core ib_uverbs
+BLUEFIELD_REQUIRED_SERVICES = openibd.service:active:exited ovsdb-server.service:active:running ovs-vswitchd.service:active:running
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv
 BLUEFIELD_EXPECTED_INTERFACES = /REPLACE_WITH_DPU_CONFIG_PATH/expected-interfaces.json
 BLUEFIELD_EXPECTED_MANAGEMENT = /REPLACE_WITH_DPU_CONFIG_PATH/expected-management.json

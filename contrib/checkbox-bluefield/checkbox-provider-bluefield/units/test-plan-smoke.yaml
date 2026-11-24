@@ -13,6 +13,8 @@ include:
   - com.canonical.certification::miscellanea/oops_results.log
   - bluefield/cloud-init/completed
   - bluefield/network/deployment-config
+  - bluefield/doca/device-query
+  - bluefield/services/required-state
   - bluefield/kernel/running-release
   - bluefield/packages/required-inventory
   - bluefield/modules/required-loaded
