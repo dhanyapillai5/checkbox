@@ -1,0 +1,28 @@
+# Synthetic format example only. Replace with the target deployment's original
+# MAAS-generated Netplan; do not copy expectations from the running DPU.
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    management:
+      match:
+        macaddress: "02:00:00:00:00:10"
+      set-name: mgmt0
+      mtu: 1500
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      addresses:
+        - 192.0.2.10/24
+      routes:
+        - to: default
+          via: 192.0.2.1
+    data-port:
+      match:
+        macaddress: "02:00:00:00:00:11"
+      set-name: p1
+      mtu: 1500
+      dhcp4: false
+      dhcp6: false
+      accept-ra: false
+      addresses: []

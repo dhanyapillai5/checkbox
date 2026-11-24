@@ -1,0 +1,6 @@
+[
+  {"flavour": "physical", "port": 0},
+  {"flavour": "physical", "port": 1},
+  {"flavour": "pcipf", "controller": 1, "pfnum": 0, "external": true},
+  {"flavour": "pcipf", "controller": 1, "pfnum": 1, "external": true}
+]

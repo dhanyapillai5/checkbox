@@ -59,48 +59,93 @@ Keep the same environment and `PROVIDERPATH` when invoking Checkbox.
 
 ## Running the smoke plan
 
+### Reference inputs for all checks
+
+See [the reference examples](checkbox-provider-bluefield/data/README.md) for all
+file-based input formats, their authoritative sources and a suggested per-run
+layout. These follow the provider `data/` structure used elsewhere in Checkbox.
+Actual candidate/deployment references remain external run inputs.
+
+| Check | Launcher input | Authoritative source |
+|---|---|---|
+| Kernel release | `BLUEFIELD_EXPECTED_KERNEL` | Candidate build or selected kernel candidate |
+| Required packages | `BLUEFIELD_CANDIDATE_INVENTORY`, `BLUEFIELD_REQUIRED_PACKAGES` | Candidate inventory and reviewed required subset |
+| Loaded modules | `BLUEFIELD_REQUIRED_MODULES` | Required platform/stack configuration |
+| PCI bindings | `BLUEFIELD_EXPECTED_PCI` | Reviewed hardware profile |
+| Interface/representor roles | `BLUEFIELD_EXPECTED_INTERFACES` | Reviewed deployment topology |
+| Management interfaces | `BLUEFIELD_EXPECTED_MANAGEMENT` | Required backing-driver identities |
+| Network configuration | `BLUEFIELD_MAAS_NETWORK_CONFIG` | Independent original MAAS deployment Netplan |
+| Cloud-init | `BLUEFIELD_EXPECTED_DATASOURCE`, network reference above | Deployment configuration |
+| Tmfifo address | `BLUEFIELD_EXPECTED_TMFIFO_ADDRESS` | Intended image/deployment configuration |
+
+The live six-check trial selected kernel, packages, modules, PCI, interface roles
+and management identities. Its role profile covered four physical/host-PF roles,
+not SFs. The separate cloud-init trial passed using the superseded manual
+recovery profile. The updated MAAS-reference network/cloud-init checks and tmfifo
+address check still require live validation on the customized image. Example
+files and local helper tests are not hardware qualification evidence.
+
+### MAAS deployment network configuration
+
+See [the synthetic Netplan reference](checkbox-provider-bluefield/data/network/maas-network-reference.yaml)
+and the full launcher example below.
+
+The job `bluefield/network/deployment-config` compares the MAAS-generated
+Netplan configuration with live network state, regardless of cloud-init warnings.
+The launcher must supply `BLUEFIELD_MAAS_NETWORK_CONFIG`, an absolute path to an
+independent MAAS-generated reference Netplan file copied to the DPU. The job
+requires `cloud-id` to report `maas`. No hand-written recovery JSON is needed.
+It runs as root to read the deployment configuration. PyYAML is required
+(provided by the Checkbox Python environment).
+
+For every configured Ethernet interface, the check requires a unique MAC match,
+the requested `set-name` (or interface key), administrative UP state, the explicitly
+configured MTU, exact static addresses/prefixes and presence of requested routes.
+IPv6 link-local addresses and additional unconfigured interfaces are allowed.
+Missing or unusable static addresses and missing interfaces fail. It does not
+require carrier on an intentionally uncabled port. Both `gateway4`/`gateway6`
+and static `routes` are supported, including route metrics, tables and on-link
+flags. Additional routes are allowed. All external commands have 30-second
+timeouts; observations and the evaluated expectations are retained in job output.
+
+This initial slice supports directly addressed, MAC-matched static Ethernet
+configuration with networkd. DHCP, explicit RA enablement, bridges, bonds, VLANs
+and unsupported Ethernet settings fail explicitly. DNS resolver behaviour,
+users, SSH keys, connectivity and BlueField devlink roles are separate checks;
+this job does not claim full deployment acceptance.
+
+Automation must capture the original MAAS-generated Netplan, retain it as
+evidence, copy it to the DPU and supply its path through the launcher. That
+runner-side capture is not yet implemented here; the checker accepts the
+reference as an explicit input. There is no fallback to installed DPU Netplan.
+Do not generate the reference from DPU configuration or `ip` output. For
+kernel regression, retain the same deployment input across kernel installation
+and reboot, and run this check again.
+
+### Cloud-init completion diagnostics
+
 The job `bluefield/cloud-init/completed` waits up to 120 seconds for cloud-init,
 then collects JSON status and `cloud-id` (each with a 30-second timeout). Supply
-`BLUEFIELD_EXPECTED_DATASOURCE` as the expected `cloud-id` value from deployment
-configuration, for example `maas` for the customized MAAS image. Do not assume
-that value for stock BFBs. Status details and command diagnostics are captured.
+`BLUEFIELD_EXPECTED_DATASOURCE` from deployment configuration, for example `maas`.
+Require `done`, the expected datasource and no fatal/stage errors. Timeouts,
+disabled/incomplete states, invalid status and unknown recoverable issues fail.
 
-Require `done` status, the expected datasource and no fatal/stage errors.
-Timeouts, disabled/incomplete states, invalid status and unknown recoverable
-issues fail. Exit code 2 or `degraded done` alone is not sufficient to classify
-the outcome. The only accepted recoverable messages are early MAAS cache/search
-event-posting warnings caused by network-unreachable errors to the datasource's
-MAAS status endpoint. These are retained as `WARNING:` diagnostics, not hidden.
-Acceptance additionally requires `BLUEFIELD_EXPECTED_OOB_ADDRESS` (address/prefix)
-and `BLUEFIELD_EXPECTED_OOB_GATEWAY`, supplied from deployment configuration.
-The job discovers the unique `mlxbf_gige` interface and verifies that address
-and default route using read-only, bounded `ip` queries. No lab defaults apply.
-An exact early `[nic not present]` rename warning can also be retained as a
-warning after final-state verification. `BLUEFIELD_EXPECTED_RENAME_RECOVERY`
-points to a JSON list supplied from reviewed deployment configuration. Example:
+Only early MAAS cache/search event-posting network-unreachable warnings to the
+datasource's status endpoint and exact early `[nic not present]` rename warnings
+can be retained. Acceptance reruns the same network verification directly; it
+does not rely on a previous job result. Reporting warnings additionally require
+a configured static address and default route. A rename warning must identify
+the same MAC/name pair in the verified deployment configuration. Other rename
+failures, Netplan failures and recoverable ERROR/CRITICAL entries remain blocking.
+Fatal failures (including failed user-data commands) cannot be excused by correct
+networking. No blanket deprecation exception exists. Retained warnings stay
+visible; a passing result does not mean clean cloud-init completion.
 
-```json
-[
-  {"name": "p1", "mac": "aa:bb:cc:dd:ee:ff", "port": 1,
-   "mtu": 1500, "addresses": []}
-]
-```
-
-Each profile describes a directly addressed physical port: exact final name,
-MAC, devlink physical-port number, MTU and non-link-local address/prefix list.
-The interface must be administratively UP, the MAC and role must be unique,
-and the non-link-local addresses must match exactly. IPv6 link-local addresses
-are allowed; `addresses: []` explicitly requires no other L3 addresses, rather
-than skipping verification. Missing/ambiguous profiles, final-state mismatches,
-or failed evidence queries cannot pass. Read-only `ip` and `devlink` queries
-have 30-second timeouts. Profiles do not assert DHCP behaviour, routes, bridge/
-bond membership or connectivity: deployments requiring these need additional
-checks before enabling this exception. Do not derive profiles from live state.
-Other rename failures, Netplan failures, unrecognised warnings and recoverable
-ERROR/CRITICAL entries remain blocking. No blanket deprecation exception exists.
-The job can pass with reporting warnings; it does not claim clean completion.
-Resulting user, SSH-key and network state require separate assertions.
-Cloud-init-check BF3 execution remains unverified.
+The previous `BLUEFIELD_EXPECTED_RENAME_RECOVERY`,
+`BLUEFIELD_EXPECTED_OOB_ADDRESS` and `BLUEFIELD_EXPECTED_OOB_GATEWAY` inputs are
+replaced by the MAAS-generated network configuration. Both updated jobs require
+a new live BF3 trial; the earlier manual-profile trial is not verification of
+this implementation.
 
 The job `bluefield/kernel/running-release` compares the running kernel with
 `BLUEFIELD_EXPECTED_KERNEL`. Supply the exact expected release from the image or
@@ -242,9 +287,7 @@ type = silent
 
 [environment]
 BLUEFIELD_EXPECTED_DATASOURCE = REPLACE_WITH_DEPLOYMENT_DATASOURCE
-BLUEFIELD_EXPECTED_OOB_ADDRESS = REPLACE_WITH_DEPLOYMENT_OOB_ADDRESS_PREFIX
-BLUEFIELD_EXPECTED_OOB_GATEWAY = REPLACE_WITH_DEPLOYMENT_OOB_GATEWAY
-BLUEFIELD_EXPECTED_RENAME_RECOVERY = /REPLACE_WITH_DEPLOYMENT_PATH/rename-recovery.json
+BLUEFIELD_MAAS_NETWORK_CONFIG = /REPLACE_WITH_REFERENCE_PATH/maas-network-reference.yaml
 BLUEFIELD_EXPECTED_KERNEL = REPLACE_WITH_CANDIDATE_KERNEL_RELEASE
 BLUEFIELD_CANDIDATE_INVENTORY = /REPLACE_WITH_CANDIDATE_PATH/package-inventory.tsv
 BLUEFIELD_REQUIRED_PACKAGES = REPLACE_WITH_REQUIRED_PACKAGE_NAMES

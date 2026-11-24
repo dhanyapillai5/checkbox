@@ -1,0 +1,4 @@
+{
+  "oob": {"driver": "mlxbf_gige"},
+  "tmfifo": {"driver": "virtio_net", "parent_driver": "bf-tmfifo"}
+}
