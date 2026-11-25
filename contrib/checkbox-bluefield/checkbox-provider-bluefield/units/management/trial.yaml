@@ -1,0 +1,17 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/management/tmfifo-address-trial
+summary: Verify temporary DPU tmfifo address configuration and restoration
+description: |
+  Discover tmfifo through virtio_net under bf-tmfifo. Temporarily assign the
+  explicit IPv4/prefix in BLUEFIELD_TEST_TMFIFO_ADDRESS and bring the link UP.
+  Verify address assignment, then remove only the test-added address and restore
+  original UP/DOWN state, including on failure. Existing UP interface addresses
+  are preserved; an addressed DOWN interface is rejected before modification.
+  No host connectivity or persistent network configuration is changed.
+plugin: shell
+user: root
+estimated_duration: 3
+environ:
+  - BLUEFIELD_TEST_TMFIFO_ADDRESS
+command: bluefield_tmfifo_trial.py
