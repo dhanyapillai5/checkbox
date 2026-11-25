@@ -1,4 +1,4 @@
 {
-  "other_config": {"doca-init": "true", "hw-offload": "true"},
+  "other_config": {"doca-init": "true", "default-datapath-type": "netdev"},
   "datapath_type": "netdev"
 }

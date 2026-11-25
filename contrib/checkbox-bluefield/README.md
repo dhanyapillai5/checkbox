@@ -326,6 +326,12 @@ trials by changing only copied expectations, not live service/configuration stat
 path to JSON containing a nonempty string `other_config` map and explicit
 `datapath_type`. See the [example](checkbox-provider-bluefield/data/ovs/init-policy.json).
 Supply policy independently from reviewed candidate/deployment requirements.
+For the image-only MAAS profile, `OVS_DOCA=yes` preserves NVIDIA's DOCA startup
+support, with `doca-init=true` and `default-datapath-type=netdev`. The deployment
+helper provisions firmware; it does not consume `dpu-lag-hash-userdata.yaml`,
+enable `hw-offload` or create OVS topology. This profile therefore does not
+require `hw-offload=true`. Additional settings belong to a profile whose
+deployment explicitly configures them.
 The job runs as root and first requires the expected global settings; it does
 not set them or restart OVS. A mismatch fails before creating objects.
 
