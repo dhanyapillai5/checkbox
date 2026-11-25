@@ -1,0 +1,17 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/ovs/initialization
+summary: Verify temporary OVS bridge and internal port initialization
+description: |
+  BLUEFIELD_OVS_INIT_POLICY supplies independent other_config and datapath_type
+  expectations as JSON. Require global settings without changing them, create
+  a uniquely owned bridge/internal port and check datapath ID, interface ofports
+  and errors. Always attempt ownership-checked cleanup after creation, including
+  on failure. Verify selected pre-existing OVS configuration and removal of test
+  objects/netdevs. Does not attach physical ports, send traffic or prove offload.
+plugin: shell
+user: root
+estimated_duration: 10
+environ:
+  - BLUEFIELD_OVS_INIT_POLICY
+command: bluefield_ovs_init.py
