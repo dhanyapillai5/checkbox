@@ -20,6 +20,8 @@ Not every expectation needs a file. The launcher supplies the expected kernel,
 required package/module/hold lists, expected datasource and required tmfifo
 address/prefix directly. Their authoritative sources and a full launcher example
 are documented in the [provider README](../../README.md#running-the-smoke-plan).
+The [complete launcher template](../../examples/smoke.launcher) includes all
+inputs used by the current smoke selection.
 
 ## Real validation runs
 

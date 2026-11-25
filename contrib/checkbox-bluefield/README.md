@@ -172,6 +172,9 @@ Stock jobs use `com.canonical.certification::`:
 
 ## Running the smoke plan
 
+Use the [complete launcher template](examples/smoke.launcher) with the
+[example instructions](examples/README.md) for all selected jobs.
+
 Create a launcher using the input names above. For example, this selects only
 the kernel job; omit `match` to select the entire plan and supply every selected
 job's required inputs.
