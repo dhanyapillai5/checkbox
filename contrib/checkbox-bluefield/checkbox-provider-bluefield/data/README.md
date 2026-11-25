@@ -10,6 +10,7 @@ relative to `PLAINBOX_PROVIDER_DATA`.
 | `packages/package-inventory.tsv` | Synthetic package/version/architecture row. Use the actual candidate build's inventory, not a DPU package export. |
 | `packages/expected-conflicts.tsv` | Synthetic package/exact Conflicts TSV. Derive fields from the candidate's pinned customization/release policy, not installed DPU metadata. |
 | `image/expected-settings.json` | Synthetic file/key/value expectations. Use literal settings from the candidate's pinned customization policy, not a DPU configuration export. |
+| `ovs/init-policy.json` | Illustrative global OVS settings and temporary bridge datapath. Review against the agreed candidate/deployment policy; no fallback to observed settings. |
 | `pci/expected-pci.tsv` | Illustrative two-function BF3 profile. Confirm PCI addresses, IDs and bindings against the reviewed target hardware profile. |
 | `management/expected-management.json` | Illustrates OOB and tmfifo driver identities; review against the required platform configuration. |
 | `interfaces/expected-interfaces.json` | Two physical ports and two host-PF representors, matching the scope of the six-check trial. SF roles are intentionally absent from this example, so it cannot establish full representor coverage. |

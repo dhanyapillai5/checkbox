@@ -16,6 +16,7 @@ include:
   - bluefield/doca/device-query
   - bluefield/services/required-state
   - bluefield/services/enablement
+  - bluefield/ovs/initialization
   - bluefield/image/config-settings
   - bluefield/kernel/running-release
   - bluefield/kernel/boot-arguments

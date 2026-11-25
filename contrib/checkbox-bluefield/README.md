@@ -129,6 +129,7 @@ Actual candidate/deployment references remain external run inputs.
 | Required service states | `BLUEFIELD_REQUIRED_SERVICES` | Reviewed deployment service policy |
 | Service/timer enablement | `BLUEFIELD_SERVICE_ENABLEMENT` | Pinned candidate enable/disable policy |
 | Configuration settings | `BLUEFIELD_EXPECTED_SETTINGS` | Pinned candidate file/key/value customizations |
+| Temporary OVS initialization | `BLUEFIELD_OVS_INIT_POLICY` | Reviewed candidate/deployment OVS initialization policy |
 | Tmfifo address | `BLUEFIELD_EXPECTED_TMFIFO_ADDRESS` | Intended image/deployment configuration |
 
 The live six-check trial selected kernel, packages, modules, PCI, interface roles
@@ -319,6 +320,38 @@ Manual Sandbird queries matched six enabled units, seven disabled units and all
 three settings; live execution of these new jobs is pending. Exercise negative
 trials by changing only copied expectations, not live service/configuration state.
 
+### Temporary OVS initialization (partial S10 coverage)
+
+`bluefield/ovs/initialization` reads `BLUEFIELD_OVS_INIT_POLICY`, an absolute
+path to JSON containing a nonempty string `other_config` map and explicit
+`datapath_type`. See the [example](checkbox-provider-bluefield/data/ovs/init-policy.json).
+Supply policy independently from reviewed candidate/deployment requirements.
+The job runs as root and first requires the expected global settings; it does
+not set them or restart OVS. A mismatch fails before creating objects.
+
+It then creates one uniquely named bridge with that datapath and one internal
+port in an atomic transaction, tagging the bridge with a unique ownership ID.
+It requires a valid bridge datapath ID and positive ofports without interface
+errors for both internal interfaces. Commands use OVS's normal reconfiguration
+wait, a 20-second OVS timeout and a 30-second process timeout. No physical ports
+or deployment interfaces are attached and no traffic is sent. This establishes
+object/datapath initialization, not functional forwarding or hardware offload.
+Bond, representor and DOCA physical-port initialization are not covered by this
+initial slice, nor does a `doca-init` setting alone prove DOCA runtime readiness.
+
+Cleanup is attempted after successful creation, create failures/timeouts and
+interrupts, including SIGTERM. It deletes only the owned bridge after checking
+for unexpected attached ports. It verifies removal of OVS objects/netdevs and
+compares selected pre/post configuration fields for all existing bridges, ports,
+interfaces and global other_config. Concurrent configuration changes fail the
+comparison. Ownership changes, unexpected attachments or cleanup failures fail
+with evidence rather than deleting foreign objects. Forced termination such as
+SIGKILL cannot run cleanup; retain logged names/ownership for recovery.
+
+Run without concurrent OVS configuration changes. This new job requires a live
+trial; local mocked tests do not establish DPU initialization. Traffic and actual
+hardware-offload proof remain full-release tests.
+
 ### Cloud-init completion diagnostics
 
 The job `bluefield/cloud-init/completed` waits up to 120 seconds for cloud-init,
@@ -498,6 +531,7 @@ BLUEFIELD_REQUIRED_MODULES = mlx5_core mlx5_ib openvswitch mlxbf_gige mlxbf_tmfi
 BLUEFIELD_REQUIRED_SERVICES = openibd.service:active:exited ovsdb-server.service:active:running ovs-vswitchd.service:active:running
 BLUEFIELD_SERVICE_ENABLEMENT = REPLACE_WITH_CANDIDATE_UNIT_STATE_TOKENS
 BLUEFIELD_EXPECTED_SETTINGS = /REPLACE_WITH_CANDIDATE_PATH/expected-settings.json
+BLUEFIELD_OVS_INIT_POLICY = /REPLACE_WITH_DEPLOYMENT_PATH/ovs-init-policy.json
 BLUEFIELD_EXPECTED_PCI = /REPLACE_WITH_DPU_CONFIG_PATH/expected-pci.tsv
 BLUEFIELD_EXPECTED_INTERFACES = /REPLACE_WITH_DPU_CONFIG_PATH/expected-interfaces.json
 BLUEFIELD_EXPECTED_MANAGEMENT = /REPLACE_WITH_DPU_CONFIG_PATH/expected-management.json
