@@ -1,0 +1,28 @@
+# Copyright 2026 Canonical Ltd.
+# SPDX-License-Identifier: GPL-3.0-only
+id: bluefield/logs/kernel-journal.txt
+summary: Attach current-boot kernel journal
+description: |
+  Attach the complete available kernel journal for the current boot, identified
+  by boot ID. Diagnostic evidence only; no message classification. Collection
+  errors and timeouts fail the attachment job. Does not clear or change logs.
+plugin: attachment
+mime-type: text/plain
+user: root
+estimated_duration: 2
+command: bluefield_journal.py kernel
+---
+id: bluefield/logs/service-journal.txt
+summary: Attach current-boot required-service journals
+description: |
+  Attach available current-boot journals for units in BLUEFIELD_REQUIRED_SERVICES.
+  Uses the same unit:active:substate input as the required-state assertion.
+  Diagnostic evidence only; empty unit journals do not prove healthy services.
+  Invalid inputs, collection errors and timeouts fail the attachment job.
+plugin: attachment
+mime-type: text/plain
+user: root
+estimated_duration: 2
+environ:
+  - BLUEFIELD_REQUIRED_SERVICES
+command: bluefield_journal.py services
