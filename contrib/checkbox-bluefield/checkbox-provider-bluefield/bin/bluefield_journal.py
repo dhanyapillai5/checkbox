@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import uuid
 
 from bluefield_services import read_expectations
 
@@ -28,6 +29,8 @@ def main(argv=None):
         boot = Path("/proc/sys/kernel/random/boot_id").read_text().strip()
         if not boot:
             raise ValueError("Missing current boot identity")
+        # journalctl boot descriptors require the compact systemd ID form.
+        boot = uuid.UUID(boot).hex
         command = [
             "journalctl",
             "--boot=" + boot,

@@ -27,7 +27,7 @@ class JournalAttachmentTests(unittest.TestCase):
         self,
         scope="kernel",
         required="ovsdb.service:active:running",
-        boot="test-boot\n",
+        boot="2a1e209e-a643-437a-8909-afaa376aa7ba\n",
         error=None,
         returncode=0,
     ):
@@ -48,12 +48,23 @@ class JournalAttachmentTests(unittest.TestCase):
     def test_kernel_journal_pinned_to_current_boot_and_streamed(self):
         status, query, output = self.run_check()
         self.assertEqual(status, 0)
-        self.assertIn("--boot=test-boot", query.call_args.args[0])
+        self.assertIn(
+            "--boot=2a1e209ea643437a8909afaa376aa7ba", query.call_args.args[0]
+        )
         self.assertIn("--dmesg", query.call_args.args[0])
         self.assertNotIn("--unit", query.call_args.args[0])
         self.assertNotIn("capture_output", query.call_args.kwargs)
         self.assertEqual(query.call_args.kwargs["timeout"], 60)
-        self.assertIn("Boot ID: test-boot", output)
+        self.assertIn("Boot ID: 2a1e209ea643437a8909afaa376aa7ba", output)
+
+    def test_compact_boot_identity_is_preserved(self):
+        status, query, _ = self.run_check(
+            boot="2a1e209ea643437a8909afaa376aa7ba\n"
+        )
+        self.assertEqual(status, 0)
+        self.assertIn(
+            "--boot=2a1e209ea643437a8909afaa376aa7ba", query.call_args.args[0]
+        )
 
     def test_service_units_come_only_from_explicit_input(self):
         status, query, _ = self.run_check(
@@ -83,9 +94,11 @@ class JournalAttachmentTests(unittest.TestCase):
                 query.assert_not_called()
 
     def test_boot_identity_required(self):
-        status, query, _ = self.run_check(boot="")
-        self.assertEqual(status, 1)
-        query.assert_not_called()
+        for boot in ("", "test-boot"):
+            with self.subTest(boot=boot):
+                status, query, _ = self.run_check(boot=boot)
+                self.assertEqual(status, 1)
+                query.assert_not_called()
 
     def test_failed_or_timed_out_collection_cannot_pass(self):
         self.assertEqual(self.run_check(returncode=1)[0], 1)
