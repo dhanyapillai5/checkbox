@@ -29,6 +29,6 @@ include:
   - bluefield/pci/expected-bindings
   - bluefield/interfaces/expected-roles
   - bluefield/management/expected-interfaces
-  - bluefield/management/tmfifo-address
+  - bluefield/management/tmfifo-address-trial
 bootstrap_include:
   - com.canonical.certification::executable
