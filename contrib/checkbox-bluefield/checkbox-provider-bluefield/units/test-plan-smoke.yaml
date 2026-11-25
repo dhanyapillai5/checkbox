@@ -11,6 +11,8 @@ include:
   - com.canonical.certification::services/no-failed-units
   - com.canonical.certification::miscellanea/oops
   - com.canonical.certification::miscellanea/oops_results.log
+  - bluefield/logs/kernel-journal.txt
+  - bluefield/logs/service-journal.txt
   - bluefield/cloud-init/completed
   - bluefield/network/deployment-config
   - bluefield/doca/device-query

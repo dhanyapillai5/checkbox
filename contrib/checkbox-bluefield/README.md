@@ -87,6 +87,8 @@ references, not by copying observed state to construct passing inputs.
 | [`image/release-marker`](checkbox-provider-bluefield/units/image/jobs.yaml) | `BLUEFIELD_EXPECTED_RELEASE_SUFFIX` | One release identifier in `/etc/mlnx-release` ending in the supplied suffix |
 | [`image/config-settings`](checkbox-provider-bluefield/units/image/settings.yaml) | `BLUEFIELD_EXPECTED_SETTINGS` | Unique literal assignments match file/key/value expectations |
 | [`ovs/initialization`](checkbox-provider-bluefield/units/ovs/init.yaml) | `BLUEFIELD_OVS_INIT_POLICY` | Expected global settings, temporary bridge/internal-port initialization and verified cleanup |
+| [`logs/kernel-journal.txt`](checkbox-provider-bluefield/units/logs/attachments.yaml) | None | Current-boot kernel journal attachment |
+| [`logs/service-journal.txt`](checkbox-provider-bluefield/units/logs/attachments.yaml) | `BLUEFIELD_REQUIRED_SERVICES` | Current-boot journals for the required services |
 
 Stock jobs use `com.canonical.certification::`:
 
@@ -122,6 +124,13 @@ Stock jobs use `com.canonical.certification::`:
 | `BLUEFIELD_OVS_INIT_POLICY` | JSON string map `other_config` and explicit `datapath_type`; [example](checkbox-provider-bluefield/data/ovs/init-policy.json) |
 
 ### Behaviour and limits
+
+- Journal attachments include the boot ID and complete available current-boot
+  records, without severity filtering or message classification. Collection has
+  a 60-second timeout; errors fail the attachment job. Empty service journals
+  are not health assertions. Attachments are included in Checkbox submission
+  data/report archives; HTML and JUnit present outcomes, not necessarily full log
+  contents. Retain the exported submission archive to preserve diagnostic data.
 
 - The plan selects the temporary tmfifo trial, not the read-only configured-IP
   check. It discovers tmfifo by driver identity, adds only a missing test address
